@@ -6,6 +6,9 @@ module ru.sarteam.allsearch {
     requires org.controlsfx.controls;
     requires org.kordamp.ikonli.javafx;
 
+    requires org.fxmisc.richtext;
+    requires org.fxmisc.flowless;
+
     opens ru.sarteam.allsearch to javafx.fxml;
     exports ru.sarteam.allsearch;
 }

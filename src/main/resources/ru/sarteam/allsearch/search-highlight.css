@@ -1,15 +1,31 @@
-/* Подсветка найденного текста в TextFlow (правой панели). */
+/* Подсветка найденного текста в CodeArea (правой панели). */
 .search-hit {
     -fx-fill: #c00000;
     -fx-font-weight: bold;
 }
 
-/* Полоса с нумерацией строк рядом с TextFlow. */
-#lineNumberLabel {
+/* Шрифт CodeArea и его текстовых узлов. */
+.content-area,
+.content-area .paragraph-text {
+    -fx-font-family: monospace;
+    -fx-font-size: 12px;
+}
+
+/* Убираем лишние отступы у абзацев, чтобы номера строк не «прыгали». */
+.content-area .paragraph-box {
+    -fx-padding: 0;
+}
+
+/* Полоса с нумерацией строк (paragraph graphic каждого абзаца). */
+.line-number {
     -fx-font-family: monospace;
     -fx-font-size: 12px;
     -fx-text-fill: #888888;
-    -fx-padding: 0 8 0 8;
-    -fx-border-color: transparent #d0d0d0 transparent transparent;
-    -fx-border-width: 0 1 0 0;
+    -fx-padding: 0 8 0 4;
+}
+
+/* Цвет выделения текста в CodeArea (мышь/клавиатура). */
+.content-area .selection {
+    -fx-fill: #b3d7ff;
+    -fx-stroke: #b3d7ff;
 }

@@ -6,13 +6,12 @@
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.ProgressBar?>
 <?import javafx.scene.control.SplitPane?>
-<?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.TableColumn?>
 <?import javafx.scene.control.TableView?>
 <?import javafx.scene.control.TextField?>
-<?import javafx.scene.text.TextFlow?>
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
 
 <BorderPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
@@ -49,13 +48,7 @@
                     <TableColumn fx:id="fileNameColumn" text="Файл" prefWidth="220.0"/>
                 </columns>
             </TableView>
-            <ScrollPane fx:id="contentPane" fitToWidth="false" hbarPolicy="AS_NEEDED"
-                        style="-fx-background-color: white; -fx-background: white;">
-                <HBox fx:id="contentBox" spacing="0.0">
-                    <Label fx:id="lineNumberLabel" textAlignment="RIGHT"/>
-                    <TextFlow fx:id="contentFlow" style="-fx-font-family: monospace; -fx-font-size: 12px;"/>
-                </HBox>
-            </ScrollPane>
+            <StackPane fx:id="contentPane" style="-fx-background-color: white;"/>
         </SplitPane>
     </center>
     <bottom>

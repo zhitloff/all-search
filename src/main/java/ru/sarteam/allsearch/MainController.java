@@ -5,20 +5,27 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
+import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
+import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
+import javafx.scene.control.MenuItem;
 import javafx.scene.control.ProgressBar;
-import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableRow;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.scene.control.Tooltip;
 import javafx.scene.input.MouseButton;
-import javafx.scene.text.Text;
-import javafx.scene.text.TextFlow;
+import javafx.scene.layout.StackPane;
 import javafx.stage.DirectoryChooser;
+
+import org.fxmisc.flowless.VirtualizedScrollPane;
+import org.fxmisc.richtext.CodeArea;
+import org.fxmisc.richtext.model.StyleSpans;
+import org.fxmisc.richtext.model.StyleSpansBuilder;
 
 import java.awt.Desktop;
 import java.io.File;
@@ -27,6 +34,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -37,6 +46,10 @@ import java.util.regex.PatternSyntaxException;
  * слева список файлов с совпадениями (только имена), справа — содержимое
  * выбранного файла в текстовой панели (только чтение).
  * Поиск выполняется в фоновом потоке (Task), чтобы не блокировать UI.
+ *
+ * <p>Правая панель построена на RichTextFX ({@link CodeArea}): в отличие от
+ * JavaFX {@code TextFlow}, он поддерживает и подсветку стилей, и выделение
+ * текста с копированием в системный буфер обмена.
  */
 public class MainController {
 
@@ -63,11 +76,7 @@ public class MainController {
     @FXML
     private TableColumn<Path, String> fileNameColumn;
     @FXML
-    private ScrollPane contentPane;
-    @FXML
-    private Label lineNumberLabel;
-    @FXML
-    private TextFlow contentFlow;
+    private StackPane contentPane;
     @FXML
     private Label statusLabel;
     @FXML
@@ -84,14 +93,34 @@ public class MainController {
     private boolean lastRegex;
     private boolean lastCaseSensitive;
 
+    /** RichTextFX-область для показа содержимого файла (создаётся в {@link #initialize()}). */
+    private CodeArea contentArea;
+    /** Ширина поля с номерами строк (в px), пересчитывается при показе файла. */
+    private int lineNumberWidth = 36;
+
     @FXML
     private void initialize() {
         fileNameColumn.setCellValueFactory(cell -> new ReadOnlyStringWrapper(cell.getValue().getFileName().toString()));
 
         fileTable.setItems(files);
-        contentPane.setFitToWidth(false);
-        contentPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
-        contentFlow.setStyle("-fx-font-family: monospace; -fx-font-size: 12px;");
+
+        contentArea = new CodeArea();
+        contentArea.setEditable(false);
+        contentArea.setFocusTraversable(true);
+        contentArea.getStyleClass().add("content-area");
+        contentArea.setStyle("-fx-font-family: monospace; -fx-font-size: 12px;");
+        contentArea.setParagraphGraphicFactory(lineIndex -> lineNumberGraphic(lineIndex));
+        contentPane.getChildren().setAll(new VirtualizedScrollPane<>(contentArea));
+
+        // Выделение и копирование текста в CodeArea.
+        ContextMenu copyMenu = new ContextMenu();
+        MenuItem copyItem = new MenuItem("Копировать");
+        copyItem.setOnAction(event -> contentArea.copy());
+        copyMenu.getItems().add(copyItem);
+        contentArea.setOnContextMenuRequested(event -> {
+            copyItem.setDisable(contentArea.getSelectedText().isEmpty());
+            copyMenu.show(contentArea, event.getScreenX(), event.getScreenY());
+        });
 
         fileTable.setRowFactory(tv -> {
             TableRow<Path> row = new TableRow<>();
@@ -120,8 +149,7 @@ public class MainController {
     /** Показывает содержимое выбранного слева файла в правой панели, подсвечивая найденный текст. */
     private void showFileContent(Path file) {
         if (file == null) {
-            lineNumberLabel.setText("");
-            contentFlow.getChildren().clear();
+            contentArea.replaceText(0, contentArea.getLength(), "");
             return;
         }
         try {
@@ -130,67 +158,68 @@ public class MainController {
                 text = text.substring(0, MAX_DISPLAY_CHARS)
                         + "\n\n… (файл обрезан для отображения: всего символов " + text.length() + ")";
             }
-            lineNumberLabel.setText(buildLineNumbers(text));
-            contentFlow.getChildren().setAll(buildHighlightedRuns(text));
+            lineNumberWidth = 4 + 8 * String.valueOf(countLines(text)).length();
+            contentArea.replaceText(0, contentArea.getLength(), text);
+            contentArea.setStyleSpans(0, buildHighlightSpans(text));
         } catch (IOException e) {
-            lineNumberLabel.setText("");
-            contentFlow.getChildren().clear();
+            contentArea.replaceText(0, contentArea.getLength(), "");
             statusLabel.setText("Не удалось прочитать файл: " + e.getMessage());
         }
     }
 
-    /** Номера строк от 1 до числа строк в тексте, по одному на строку. */
-    private static String buildLineNumbers(String text) {
+    /** Число строк в тексте (считает символы '\n'). */
+    private static int countLines(String text) {
         int count = 1;
         for (int i = 0; i < text.length(); i++) {
             if (text.charAt(i) == '\n') {
                 count++;
             }
         }
-        StringBuilder sb = new StringBuilder(count * 4);
-        for (int i = 1; i <= count; i++) {
-            if (i > 1) {
-                sb.append('\n');
-            }
-            sb.append(i);
-        }
-        return sb.toString();
+        return count;
+    }
+
+    /** График (номер строки) для каждого абзаца CodeArea. */
+    private Node lineNumberGraphic(int lineIndex) {
+        Label label = new Label(String.valueOf(lineIndex + 1));
+        label.getStyleClass().add("line-number");
+        label.setAlignment(Pos.CENTER_RIGHT);
+        label.setMinWidth(lineNumberWidth);
+        label.setPrefWidth(lineNumberWidth);
+        label.setMaxWidth(lineNumberWidth);
+        return label;
     }
 
     /**
-     * Разбивает текст на фрагменты {@link Text} и подсвечивает совпадения с
-     * последним поисковым запросом (в т.ч. по рег. выражению и с учётом регистра).
+     * Стилевые интервалы для подсветки совпадений с последним поисковым
+     * запросом (в т.ч. по рег. выражению и с учётом регистра).
      */
-    private List<Text> buildHighlightedRuns(String text) {
+    private StyleSpans<Collection<String>> buildHighlightSpans(String text) {
+        StyleSpansBuilder<Collection<String>> builder = new StyleSpansBuilder<>();
         Pattern pattern = compileHighlightPattern();
-        if (pattern == null) {
-            return List.of(new Text(text));
-        }
-        List<Text> runs = new ArrayList<>();
-        Matcher matcher = pattern.matcher(text);
         int pos = 0;
-        int count = 0;
-        while (matcher.find()) {
-            int start = matcher.start();
-            int end = matcher.end();
-            if (end == start) {
-                continue; // пустые совпадения не подсвечиваем
-            }
-            if (start > pos) {
-                runs.add(new Text(text.substring(pos, start)));
-            }
-            Text hit = new Text(text.substring(start, end));
-            hit.getStyleClass().add("search-hit");
-            runs.add(hit);
-            pos = end;
-            if (++count >= MAX_HIGHLIGHTS) {
-                break; // предохранитель от огромного числа фрагментов
+        if (pattern != null) {
+            Matcher matcher = pattern.matcher(text);
+            int count = 0;
+            while (matcher.find()) {
+                int start = matcher.start();
+                int end = matcher.end();
+                if (end == start) {
+                    continue; // пустые совпадения не подсвечиваем
+                }
+                if (start > pos) {
+                    builder.add(Collections.emptyList(), start - pos);
+                }
+                builder.add(Collections.singleton("search-hit"), end - start);
+                pos = end;
+                if (++count >= MAX_HIGHLIGHTS) {
+                    break; // предохранитель от огромного числа фрагментов
+                }
             }
         }
         if (pos < text.length()) {
-            runs.add(new Text(text.substring(pos)));
+            builder.add(Collections.emptyList(), text.length() - pos);
         }
-        return runs;
+        return builder.create();
     }
 
     /** Паттерн для подсветки — те же правила, что у движка поиска. */
@@ -274,8 +303,7 @@ public class MainController {
         lastRegex = options.regex();
         lastCaseSensitive = options.caseSensitive();
         files.clear();
-        lineNumberLabel.setText("");
-        contentFlow.getChildren().clear();
+        contentArea.replaceText(0, contentArea.getLength(), "");
         allResults.clear();
         setRunning(true);
 
