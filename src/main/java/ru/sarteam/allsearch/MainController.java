@@ -65,6 +65,8 @@ public class MainController {
     @FXML
     private ScrollPane contentPane;
     @FXML
+    private Label lineNumberLabel;
+    @FXML
     private TextFlow contentFlow;
     @FXML
     private Label statusLabel;
@@ -87,8 +89,8 @@ public class MainController {
         fileNameColumn.setCellValueFactory(cell -> new ReadOnlyStringWrapper(cell.getValue().getFileName().toString()));
 
         fileTable.setItems(files);
-        contentPane.setFitToWidth(true);
-        contentPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        contentPane.setFitToWidth(false);
+        contentPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
         contentFlow.setStyle("-fx-font-family: monospace; -fx-font-size: 12px;");
 
         fileTable.setRowFactory(tv -> {
@@ -118,6 +120,7 @@ public class MainController {
     /** Показывает содержимое выбранного слева файла в правой панели, подсвечивая найденный текст. */
     private void showFileContent(Path file) {
         if (file == null) {
+            lineNumberLabel.setText("");
             contentFlow.getChildren().clear();
             return;
         }
@@ -127,11 +130,31 @@ public class MainController {
                 text = text.substring(0, MAX_DISPLAY_CHARS)
                         + "\n\n… (файл обрезан для отображения: всего символов " + text.length() + ")";
             }
+            lineNumberLabel.setText(buildLineNumbers(text));
             contentFlow.getChildren().setAll(buildHighlightedRuns(text));
         } catch (IOException e) {
+            lineNumberLabel.setText("");
             contentFlow.getChildren().clear();
             statusLabel.setText("Не удалось прочитать файл: " + e.getMessage());
         }
+    }
+
+    /** Номера строк от 1 до числа строк в тексте, по одному на строку. */
+    private static String buildLineNumbers(String text) {
+        int count = 1;
+        for (int i = 0; i < text.length(); i++) {
+            if (text.charAt(i) == '\n') {
+                count++;
+            }
+        }
+        StringBuilder sb = new StringBuilder(count * 4);
+        for (int i = 1; i <= count; i++) {
+            if (i > 1) {
+                sb.append('\n');
+            }
+            sb.append(i);
+        }
+        return sb.toString();
     }
 
     /**
@@ -251,6 +274,7 @@ public class MainController {
         lastRegex = options.regex();
         lastCaseSensitive = options.caseSensitive();
         files.clear();
+        lineNumberLabel.setText("");
         contentFlow.getChildren().clear();
         allResults.clear();
         setRunning(true);

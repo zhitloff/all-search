@@ -49,9 +49,12 @@
                     <TableColumn fx:id="fileNameColumn" text="Файл" prefWidth="220.0"/>
                 </columns>
             </TableView>
-            <ScrollPane fx:id="contentPane" fitToWidth="true" hbarPolicy="NEVER"
+            <ScrollPane fx:id="contentPane" fitToWidth="false" hbarPolicy="AS_NEEDED"
                         style="-fx-background-color: white; -fx-background: white;">
-                <TextFlow fx:id="contentFlow" style="-fx-font-family: monospace; -fx-font-size: 12px;"/>
+                <HBox fx:id="contentBox" spacing="0.0">
+                    <Label fx:id="lineNumberLabel" textAlignment="RIGHT"/>
+                    <TextFlow fx:id="contentFlow" style="-fx-font-family: monospace; -fx-font-size: 12px;"/>
+                </HBox>
             </ScrollPane>
         </SplitPane>
     </center>

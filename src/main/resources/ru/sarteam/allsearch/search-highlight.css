@@ -3,3 +3,13 @@
     -fx-fill: #c00000;
     -fx-font-weight: bold;
 }
+
+/* Полоса с нумерацией строк рядом с TextFlow. */
+#lineNumberLabel {
+    -fx-font-family: monospace;
+    -fx-font-size: 12px;
+    -fx-text-fill: #888888;
+    -fx-padding: 0 8 0 8;
+    -fx-border-color: transparent #d0d0d0 transparent transparent;
+    -fx-border-width: 0 1 0 0;
+}
