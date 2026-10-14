@@ -1,6 +1,7 @@
 module ru.sarteam.allsearch {
     requires javafx.controls;
     requires javafx.fxml;
+    requires java.desktop;
 
     requires org.controlsfx.controls;
     requires org.kordamp.ikonli.javafx;

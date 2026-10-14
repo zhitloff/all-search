@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.CheckBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ProgressBar?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+
+<BorderPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="ru.sarteam.allsearch.MainController">
+    <top>
+        <VBox spacing="8.0">
+            <padding>
+                <Insets top="10.0" right="10.0" left="10.0" bottom="0.0"/>
+            </padding>
+            <HBox spacing="8.0" alignment="CENTER_LEFT">
+                <Label text="Папка:"/>
+                <TextField fx:id="directoryField" HBox.hgrow="ALWAYS" promptText="Путь к папке для поиска"/>
+                <Button fx:id="browseButton" text="Обзор…" onAction="#onBrowse"/>
+            </HBox>
+            <HBox spacing="8.0" alignment="CENTER_LEFT">
+                <Label text="Текст:"/>
+                <TextField fx:id="queryField" HBox.hgrow="ALWAYS" promptText="Что искать…"/>
+                <Button fx:id="searchButton" text="Искать" defaultButton="true" onAction="#onSearch"/>
+                <Button fx:id="cancelButton" text="Отмена" onAction="#onCancel" disable="true"/>
+            </HBox>
+            <HBox spacing="12.0" alignment="CENTER_LEFT">
+                <CheckBox fx:id="regexCheck" text="Рег. выражение"/>
+                <CheckBox fx:id="caseCheck" text="Учитывать регистр"/>
+                <CheckBox fx:id="textOnlyCheck" text="Только текстовые" selected="true"/>
+                <Label text="Маска:"/>
+                <TextField fx:id="maskField" prefWidth="240.0" promptText="*.txt;*.md;*.java;*.xml (пусто — все файлы)"/>
+            </HBox>
+        </VBox>
+    </top>
+    <center>
+        <TableView fx:id="resultTable">
+            <columns>
+                <TableColumn fx:id="fileColumn" text="Файл" prefWidth="440.0"/>
+                <TableColumn fx:id="lineColumn" text="Строка" prefWidth="70.0"/>
+                <TableColumn fx:id="textColumn" text="Совпадение" prefWidth="400.0"/>
+            </columns>
+        </TableView>
+    </center>
+    <bottom>
+        <HBox spacing="8.0" alignment="CENTER_LEFT">
+            <padding>
+                <Insets top="6.0" right="10.0" left="10.0" bottom="10.0"/>
+            </padding>
+            <Label fx:id="statusLabel" text="Готов к поиску" HBox.hgrow="ALWAYS"/>
+            <ProgressBar fx:id="progressBar" prefWidth="160.0"/>
+        </HBox>
+    </bottom>
+</BorderPane>
