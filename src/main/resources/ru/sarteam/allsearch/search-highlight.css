@@ -4,24 +4,32 @@
     -fx-font-weight: bold;
 }
 
-/* Шрифт CodeArea и его текстовых узлов. */
-.content-area,
+/* Область с текстом (CodeArea) и её текст должны иметь один шрифт. */
+.content-area {
+    -fx-font-family: monospace;
+    -fx-font-size: 12px;
+    -fx-padding: 0;
+}
 .content-area .paragraph-text {
     -fx-font-family: monospace;
     -fx-font-size: 12px;
 }
 
-/* Убираем лишние отступы у абзацев, чтобы номера строк не «прыгали». */
-.content-area .paragraph-box {
-    -fx-padding: 0;
+/* Скроллпанель с текстом и номерами поверх белого фона панели. */
+#textScrollPane {
+    -fx-background-color: white;
+    -fx-background: white;
+    -fx-border-color: transparent;
 }
 
-/* Полоса с нумерацией строк (paragraph graphic каждого абзаца). */
-.line-number {
+/* Полоса с нумерацией строк (один Label на все строки файла). */
+#lineNumberLabel {
     -fx-font-family: monospace;
     -fx-font-size: 12px;
     -fx-text-fill: #888888;
-    -fx-padding: 0 8 0 4;
+    -fx-padding: 0 8 0 8;
+    -fx-border-color: transparent #d0d0d0 transparent transparent;
+    -fx-border-width: 0 1 0 0;
 }
 
 /* Цвет выделения текста в CodeArea (мышь/клавиатура). */

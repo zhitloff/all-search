@@ -5,24 +5,25 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
-import javafx.geometry.Pos;
-import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.ProgressBar;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableRow;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.scene.control.Tooltip;
 import javafx.scene.input.MouseButton;
-import javafx.scene.layout.StackPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.text.Font;
+import javafx.scene.text.Text;
 import javafx.stage.DirectoryChooser;
 
-import org.fxmisc.flowless.VirtualizedScrollPane;
 import org.fxmisc.richtext.CodeArea;
 import org.fxmisc.richtext.model.StyleSpans;
 import org.fxmisc.richtext.model.StyleSpansBuilder;
@@ -76,7 +77,11 @@ public class MainController {
     @FXML
     private TableColumn<Path, String> fileNameColumn;
     @FXML
-    private StackPane contentPane;
+    private ScrollPane textScrollPane;
+    @FXML
+    private HBox contentRow;
+    @FXML
+    private Label lineNumberLabel;
     @FXML
     private Label statusLabel;
     @FXML
@@ -95,8 +100,8 @@ public class MainController {
 
     /** RichTextFX-область для показа содержимого файла (создаётся в {@link #initialize()}). */
     private CodeArea contentArea;
-    /** Ширина поля с номерами строк (в px), пересчитывается при показе файла. */
-    private int lineNumberWidth = 36;
+    /** Ширина контента правой панели: номера + самая длинная строка текста (px). */
+    private double rowContentWidth;
 
     @FXML
     private void initialize() {
@@ -109,8 +114,13 @@ public class MainController {
         contentArea.setFocusTraversable(true);
         contentArea.getStyleClass().add("content-area");
         contentArea.setStyle("-fx-font-family: monospace; -fx-font-size: 12px;");
-        contentArea.setParagraphGraphicFactory(lineIndex -> lineNumberGraphic(lineIndex));
-        contentPane.getChildren().setAll(new VirtualizedScrollPane<>(contentArea));
+
+        // Номера строк и текст лежат в одном ScrollPane и прокручиваются вместе,
+        // поэтому никакой синхронизации прокрутки не нужно.
+        HBox.setHgrow(contentArea, Priority.ALWAYS);
+        contentRow.getChildren().add(contentArea);
+        // Ширина ряда подстраивается под размер панели (см. updateRowWidth).
+        textScrollPane.viewportBoundsProperty().addListener((obs, oldBounds, newBounds) -> updateRowWidth());
 
         // Выделение и копирование текста в CodeArea.
         ContextMenu copyMenu = new ContextMenu();
@@ -149,6 +159,7 @@ public class MainController {
     /** Показывает содержимое выбранного слева файла в правой панели, подсвечивая найденный текст. */
     private void showFileContent(Path file) {
         if (file == null) {
+            lineNumberLabel.setText("");
             contentArea.replaceText(0, contentArea.getLength(), "");
             return;
         }
@@ -158,10 +169,24 @@ public class MainController {
                 text = text.substring(0, MAX_DISPLAY_CHARS)
                         + "\n\n… (файл обрезан для отображения: всего символов " + text.length() + ")";
             }
-            lineNumberWidth = 4 + 8 * String.valueOf(countLines(text)).length();
+            int lineCount = countLines(text);
+            lineNumberLabel.setText(buildLineNumbers(lineCount));
+            // Номера и текст должны иметь одинаковую высоту строк, иначе они разъедутся.
+            // Высоту текстовой области задаём равной высоте колонки номеров плюс запас
+            // на несколько строк, чтобы последняя строка файла не обрезалась.
+            double contentHeight = lineNumberLabel.prefHeight(-1);
+            double lineHeight = Math.max(1, contentHeight / lineCount);
+            double areaHeight = contentHeight + 3 * lineHeight;
+            contentArea.setPrefHeight(areaHeight);
+            contentArea.setMinHeight(areaHeight);
             contentArea.replaceText(0, contentArea.getLength(), text);
             contentArea.setStyleSpans(0, buildHighlightSpans(text));
+            contentArea.requestLayout();
+            // Ширина ряда: не уже панели, но достаточно, чтобы поместилась самая длинная строка.
+            rowContentWidth = lineNumberLabel.prefWidth(-1) + widestLineWidth(text, Font.font("monospace", 12));
+            updateRowWidth();
         } catch (IOException e) {
+            lineNumberLabel.setText("");
             contentArea.replaceText(0, contentArea.getLength(), "");
             statusLabel.setText("Не удалось прочитать файл: " + e.getMessage());
         }
@@ -178,15 +203,47 @@ public class MainController {
         return count;
     }
 
-    /** График (номер строки) для каждого абзаца CodeArea. */
-    private Node lineNumberGraphic(int lineIndex) {
-        Label label = new Label(String.valueOf(lineIndex + 1));
-        label.getStyleClass().add("line-number");
-        label.setAlignment(Pos.CENTER_RIGHT);
-        label.setMinWidth(lineNumberWidth);
-        label.setPrefWidth(lineNumberWidth);
-        label.setMaxWidth(lineNumberWidth);
-        return label;
+    /** Номера строк от 1 до {@code count}, по одному на строку. */
+    private static String buildLineNumbers(int count) {
+        StringBuilder sb = new StringBuilder(count * 4);
+        for (int i = 1; i <= count; i++) {
+            if (i > 1) {
+                sb.append('\n');
+            }
+            sb.append(i);
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Ширина ряда с номерами и текстом: не уже видимой панели, но достаточно,
+     * чтобы поместилась самая длинная строка файла (тогда появится горизонтальная
+     * прокрутка ScrollPane).
+     */
+    private void updateRowWidth() {
+        double viewportWidth = textScrollPane.getViewportBounds().getWidth();
+        double rowWidth = Math.max(viewportWidth, rowContentWidth);
+        contentRow.setPrefWidth(rowWidth);
+        contentRow.setMinWidth(rowWidth);
+    }
+
+    /** Ширина самой длинной строки в пикселях (для расчёта ширины ряда). */
+    private static double widestLineWidth(String text, Font font) {
+        Text probe = new Text("0");
+        probe.setFont(font);
+        double maxWidth = 0;
+        int start = 0;
+        for (int i = 0; i <= text.length(); i++) {
+            if (i == text.length() || text.charAt(i) == '\n') {
+                probe.setText(text.substring(start, i));
+                double w = probe.getBoundsInLocal().getWidth();
+                if (w > maxWidth) {
+                    maxWidth = w;
+                }
+                start = i + 1;
+            }
+        }
+        return maxWidth;
     }
 
     /**
@@ -303,6 +360,7 @@ public class MainController {
         lastRegex = options.regex();
         lastCaseSensitive = options.caseSensitive();
         files.clear();
+        lineNumberLabel.setText("");
         contentArea.replaceText(0, contentArea.getLength(), "");
         allResults.clear();
         setRunning(true);
