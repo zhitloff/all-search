@@ -1,7 +1,6 @@
 package ru.sarteam.allsearch;
 
 import javafx.beans.property.ReadOnlyStringWrapper;
-import javafx.beans.property.SimpleObjectProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
@@ -13,7 +12,9 @@ import javafx.scene.control.ProgressBar;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableRow;
 import javafx.scene.control.TableView;
+import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
+import javafx.scene.control.Tooltip;
 import javafx.scene.input.MouseButton;
 import javafx.stage.DirectoryChooser;
 
@@ -29,7 +30,9 @@ import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
 /**
- * Контроллер главного окна: выбор папки, параметры поиска, таблица результатов.
+ * Контроллер главного окна. Результаты — в master-detail виде:
+ * слева список файлов с совпадениями (только имена), справа — содержимое
+ * выбранного файла в текстовой панели (только чтение).
  * Поиск выполняется в фоновом потоке (Task), чтобы не блокировать UI.
  */
 public class MainController {
@@ -53,53 +56,71 @@ public class MainController {
     @FXML
     private Button cancelButton;
     @FXML
-    private TableView<SearchEngine.Result> resultTable;
+    private TableView<Path> fileTable;
     @FXML
-    private TableColumn<SearchEngine.Result, String> fileColumn;
+    private TableColumn<Path, String> fileNameColumn;
     @FXML
-    private TableColumn<SearchEngine.Result, Integer> lineColumn;
-    @FXML
-    private TableColumn<SearchEngine.Result, String> textColumn;
+    private TextArea contentArea;
     @FXML
     private Label statusLabel;
     @FXML
     private ProgressBar progressBar;
 
-    private final ObservableList<SearchEngine.Result> results = FXCollections.observableArrayList();
+    private static final int MAX_DISPLAY_CHARS = 2_000_000;
+
+    private final ObservableList<Path> files = FXCollections.observableArrayList();
+    private final List<SearchEngine.Result> allResults = new ArrayList<>();
     private SearchEngine engine;
-    private Path searchRoot;
     private boolean interrupted;
 
     @FXML
     private void initialize() {
-        fileColumn.setCellValueFactory(cell -> new ReadOnlyStringWrapper(displayPath(cell.getValue())));
-        lineColumn.setCellValueFactory(cell -> new SimpleObjectProperty<>(cell.getValue().line()));
-        textColumn.setCellValueFactory(cell -> new ReadOnlyStringWrapper(cell.getValue().text()));
-        resultTable.setItems(results);
-        resultTable.setRowFactory(tv -> {
-            TableRow<SearchEngine.Result> row = new TableRow<>();
+        fileNameColumn.setCellValueFactory(cell -> new ReadOnlyStringWrapper(cell.getValue().getFileName().toString()));
+
+        fileTable.setItems(files);
+        contentArea.setPromptText("Выберите файл слева, чтобы увидеть его содержимое");
+
+        fileTable.setRowFactory(tv -> {
+            TableRow<Path> row = new TableRow<>();
+            Tooltip tooltip = new Tooltip();
+            row.itemProperty().addListener((obs, oldItem, newItem) -> {
+                if (newItem == null) {
+                    Tooltip.uninstall(row, tooltip);
+                } else {
+                    tooltip.setText(newItem.toString());
+                    Tooltip.install(row, tooltip);
+                }
+            });
             row.setOnMouseClicked(event -> {
-                if (event.getButton() == MouseButton.PRIMARY
-                        && event.getClickCount() == 2
-                        && !row.isEmpty()) {
-                    openFile(row.getItem().file());
+                if (event.getButton() == MouseButton.PRIMARY && event.getClickCount() == 2 && !row.isEmpty()) {
+                    openFile(row.getItem());
                 }
             });
             return row;
         });
-        statusLabel.setText("Укажите папку и текст, затем нажмите «Искать». Двойной щелчок по строке открывает файл.");
+
+        fileTable.getSelectionModel().selectedItemProperty().addListener((obs, oldFile, newFile) -> showFileContent(newFile));
+
+        statusLabel.setText("Укажите папку и текст, затем нажмите «Искать». Двойной щелчок открывает файл.");
     }
 
-    private String displayPath(SearchEngine.Result result) {
-        Path file = result.file();
-        if (searchRoot != null) {
-            try {
-                return searchRoot.relativize(file).toString();
-            } catch (IllegalArgumentException e) {
-                return file.toString();
-            }
+    /** Показывает содержимое выбранного слева файла в правой панели (только чтение). */
+    private void showFileContent(Path file) {
+        if (file == null) {
+            contentArea.clear();
+            return;
         }
-        return file.toString();
+        try {
+            String text = SearchEngine.readFileContent(file);
+            if (text.length() > MAX_DISPLAY_CHARS) {
+                text = text.substring(0, MAX_DISPLAY_CHARS)
+                        + "\n\n… (файл обрезан для отображения: всего символов " + text.length() + ")";
+            }
+            contentArea.setText(text);
+        } catch (IOException e) {
+            contentArea.clear();
+            statusLabel.setText("Не удалось прочитать файл: " + e.getMessage());
+        }
     }
 
     @FXML
@@ -169,8 +190,9 @@ public class MainController {
 
     private void startSearch(Path root, SearchEngine.Options options) {
         interrupted = false;
-        searchRoot = root;
-        results.clear();
+        files.clear();
+        contentArea.clear();
+        allResults.clear();
         setRunning(true);
 
         engine = new SearchEngine();
@@ -181,10 +203,18 @@ public class MainController {
             }
         };
         task.setOnSucceeded(event -> {
-            results.setAll(task.getValue());
+            allResults.addAll(task.getValue());
+            List<Path> distinctFiles = allResults.stream()
+                    .map(SearchEngine.Result::file)
+                    .distinct()
+                    .toList();
+            files.setAll(distinctFiles);
+            if (!distinctFiles.isEmpty()) {
+                fileTable.getSelectionModel().select(0); // заполнит правую панель содержимым
+            }
             finish(interrupted
-                    ? "Поиск прерван. Найдено совпадений: " + results.size()
-                    : "Готово. Найдено совпадений: " + results.size());
+                    ? "Поиск прерван. Файлов: " + files.size() + ", совпадений: " + allResults.size()
+                    : "Готово. Файлов: " + files.size() + ", совпадений: " + allResults.size());
         });
         task.setOnFailed(event -> {
             Throwable err = task.getException();

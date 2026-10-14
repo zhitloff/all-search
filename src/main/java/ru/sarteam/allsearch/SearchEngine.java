@@ -81,6 +81,15 @@ public final class SearchEngine {
         return results;
     }
 
+    /**
+     * Читает файл и декодирует его в текст (те же кодировки, что и при поиске:
+     * UTF-8, UTF-16 с BOM, windows-1251). Используется для показа содержимого
+     * выбранного файла в правой панели.
+     */
+    public static String readFileContent(Path file) throws IOException {
+        return decode(Files.readAllBytes(file));
+    }
+
     private void walk(Path dir, Options options, Pattern pattern, String needle, List<PathMatcher> matchers,
                       List<Result> results, Consumer<String> onFile) {
         if (cancelled.get()) {

@@ -5,8 +5,10 @@
 <?import javafx.scene.control.CheckBox?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.ProgressBar?>
+<?import javafx.scene.control.SplitPane?>
 <?import javafx.scene.control.TableColumn?>
 <?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextArea?>
 <?import javafx.scene.control.TextField?>
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.HBox?>
@@ -40,13 +42,15 @@
         </VBox>
     </top>
     <center>
-        <TableView fx:id="resultTable">
-            <columns>
-                <TableColumn fx:id="fileColumn" text="Файл" prefWidth="440.0"/>
-                <TableColumn fx:id="lineColumn" text="Строка" prefWidth="70.0"/>
-                <TableColumn fx:id="textColumn" text="Совпадение" prefWidth="400.0"/>
-            </columns>
-        </TableView>
+        <SplitPane dividerPositions="0.35">
+            <TableView fx:id="fileTable">
+                <columns>
+                    <TableColumn fx:id="fileNameColumn" text="Файл" prefWidth="220.0"/>
+                </columns>
+            </TableView>
+            <TextArea fx:id="contentArea" editable="false" wrapText="false"
+                      style="-fx-font-family: monospace; -fx-font-size: 12px;"/>
+        </SplitPane>
     </center>
     <bottom>
         <HBox spacing="8.0" alignment="CENTER_LEFT">
