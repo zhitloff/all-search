@@ -9,13 +9,15 @@ import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressBar;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableRow;
 import javafx.scene.control.TableView;
-import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.Tooltip;
 import javafx.scene.input.MouseButton;
+import javafx.scene.text.Text;
+import javafx.scene.text.TextFlow;
 import javafx.stage.DirectoryChooser;
 
 import java.awt.Desktop;
@@ -26,6 +28,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
@@ -60,25 +63,33 @@ public class MainController {
     @FXML
     private TableColumn<Path, String> fileNameColumn;
     @FXML
-    private TextArea contentArea;
+    private ScrollPane contentPane;
+    @FXML
+    private TextFlow contentFlow;
     @FXML
     private Label statusLabel;
     @FXML
     private ProgressBar progressBar;
 
     private static final int MAX_DISPLAY_CHARS = 2_000_000;
+    private static final int MAX_HIGHLIGHTS = 5_000;
 
     private final ObservableList<Path> files = FXCollections.observableArrayList();
     private final List<SearchEngine.Result> allResults = new ArrayList<>();
     private SearchEngine engine;
     private boolean interrupted;
+    private String lastQuery;
+    private boolean lastRegex;
+    private boolean lastCaseSensitive;
 
     @FXML
     private void initialize() {
         fileNameColumn.setCellValueFactory(cell -> new ReadOnlyStringWrapper(cell.getValue().getFileName().toString()));
 
         fileTable.setItems(files);
-        contentArea.setPromptText("Выберите файл слева, чтобы увидеть его содержимое");
+        contentPane.setFitToWidth(true);
+        contentPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        contentFlow.setStyle("-fx-font-family: monospace; -fx-font-size: 12px;");
 
         fileTable.setRowFactory(tv -> {
             TableRow<Path> row = new TableRow<>();
@@ -104,10 +115,10 @@ public class MainController {
         statusLabel.setText("Укажите папку и текст, затем нажмите «Искать». Двойной щелчок открывает файл.");
     }
 
-    /** Показывает содержимое выбранного слева файла в правой панели (только чтение). */
+    /** Показывает содержимое выбранного слева файла в правой панели, подсвечивая найденный текст. */
     private void showFileContent(Path file) {
         if (file == null) {
-            contentArea.clear();
+            contentFlow.getChildren().clear();
             return;
         }
         try {
@@ -116,11 +127,57 @@ public class MainController {
                 text = text.substring(0, MAX_DISPLAY_CHARS)
                         + "\n\n… (файл обрезан для отображения: всего символов " + text.length() + ")";
             }
-            contentArea.setText(text);
+            contentFlow.getChildren().setAll(buildHighlightedRuns(text));
         } catch (IOException e) {
-            contentArea.clear();
+            contentFlow.getChildren().clear();
             statusLabel.setText("Не удалось прочитать файл: " + e.getMessage());
         }
+    }
+
+    /**
+     * Разбивает текст на фрагменты {@link Text} и подсвечивает совпадения с
+     * последним поисковым запросом (в т.ч. по рег. выражению и с учётом регистра).
+     */
+    private List<Text> buildHighlightedRuns(String text) {
+        Pattern pattern = compileHighlightPattern();
+        if (pattern == null) {
+            return List.of(new Text(text));
+        }
+        List<Text> runs = new ArrayList<>();
+        Matcher matcher = pattern.matcher(text);
+        int pos = 0;
+        int count = 0;
+        while (matcher.find()) {
+            int start = matcher.start();
+            int end = matcher.end();
+            if (end == start) {
+                continue; // пустые совпадения не подсвечиваем
+            }
+            if (start > pos) {
+                runs.add(new Text(text.substring(pos, start)));
+            }
+            Text hit = new Text(text.substring(start, end));
+            hit.getStyleClass().add("search-hit");
+            runs.add(hit);
+            pos = end;
+            if (++count >= MAX_HIGHLIGHTS) {
+                break; // предохранитель от огромного числа фрагментов
+            }
+        }
+        if (pos < text.length()) {
+            runs.add(new Text(text.substring(pos)));
+        }
+        return runs;
+    }
+
+    /** Паттерн для подсветки — те же правила, что у движка поиска. */
+    private Pattern compileHighlightPattern() {
+        if (lastQuery == null || lastQuery.isEmpty()) {
+            return null;
+        }
+        int flags = lastCaseSensitive ? 0 : Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE;
+        String expr = lastRegex ? lastQuery : Pattern.quote(lastQuery);
+        return Pattern.compile(expr, flags);
     }
 
     @FXML
@@ -190,8 +247,11 @@ public class MainController {
 
     private void startSearch(Path root, SearchEngine.Options options) {
         interrupted = false;
+        lastQuery = options.query();
+        lastRegex = options.regex();
+        lastCaseSensitive = options.caseSensitive();
         files.clear();
-        contentArea.clear();
+        contentFlow.getChildren().clear();
         allResults.clear();
         setRunning(true);
 

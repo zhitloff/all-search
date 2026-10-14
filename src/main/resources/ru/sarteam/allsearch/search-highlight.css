@@ -1,0 +1,5 @@
+/* Подсветка найденного текста в TextFlow (правой панели). */
+.search-hit {
+    -fx-fill: #c00000;
+    -fx-font-weight: bold;
+}
