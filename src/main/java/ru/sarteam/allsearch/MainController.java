@@ -124,13 +124,8 @@ public class MainController {
     private boolean lastRegex;
     private boolean lastCaseSensitive;
     private List<String> allFontFamilies = List.of();
-    private final List<Hit> currentHits = new ArrayList<>();
+    private final SearchResultNavigator resultNavigator = new SearchResultNavigator();
     private final SyntaxHighlighter syntaxHighlighter = new SyntaxHighlighter();
-    private int currentHitIndex = -1;
-    /** Отложенный индекс совпадения, который нужно выставить после смены файла. */
-    private Integer pendingHitIndex;
-
-    private record Hit(int start, int end) {}
 
     /** RichTextFX-область для показа содержимого файла (создаётся в {@link #initialize()}). */
     private CodeArea contentArea;
@@ -213,9 +208,7 @@ public class MainController {
             lineNumberLabel.setText("");
             lineNumberHighlightLabel.setText("");
             contentArea.replaceText(0, contentArea.getLength(), "");
-            currentHits.clear();
-            currentHitIndex = -1;
-            pendingHitIndex = null;
+            resultNavigator.clear();
             updateFileMatchesLabel();
             updateHitButtons();
             return;
@@ -243,15 +236,8 @@ public class MainController {
             contentArea.setStyleSpans(0, syntaxHighlighter.build(file, text, lastQuery, lastRegex, lastCaseSensitive));
             rebuildHits(text);
             updateFileMatchesLabel();
-            int initialHit;
-            if (pendingHitIndex == null) {
-                initialHit = 0;
-            } else if (pendingHitIndex == Integer.MAX_VALUE) {
-                initialHit = currentHits.isEmpty() ? 0 : currentHits.size() - 1;
-            } else {
-                initialHit = pendingHitIndex;
-            }
-            pendingHitIndex = null;
+            int initialHit = resultNavigator.initialHitIndex();
+            resultNavigator.clearPendingHit();
             focusHit(initialHit);
             contentArea.requestLayout();
             // Ширина ряда: не уже панели, но достаточно, чтобы поместилась самая длинная строка.
@@ -262,9 +248,7 @@ public class MainController {
             lineNumberHighlightLabel.setText("");
             contentArea.replaceText(0, contentArea.getLength(), "");
             currentLineCount = 1;
-            currentHits.clear();
-            currentHitIndex = -1;
-            pendingHitIndex = null;
+            resultNavigator.clear();
             updateFileMatchesLabel();
             updateHitButtons();
             statusLabel.setText("Не удалось прочитать файл: " + e.getMessage());
@@ -272,8 +256,7 @@ public class MainController {
     }
 
     private void rebuildHits(String text) {
-        currentHits.clear();
-        currentHitIndex = -1;
+        List<SearchResultNavigator.Hit> hits = new ArrayList<>();
         Pattern pattern = compileHighlightPattern();
         if (pattern != null) {
             Matcher matcher = pattern.matcher(text);
@@ -281,24 +264,23 @@ public class MainController {
                 int start = matcher.start();
                 int end = matcher.end();
                 if (end > start) {
-                    currentHits.add(new Hit(start, end));
+                    hits.add(new SearchResultNavigator.Hit(start, end));
                 }
             }
         }
+        resultNavigator.setHits(hits);
         updateHitButtons();
     }
 
     private void focusHit(int index) {
-        if (currentHits.isEmpty()) {
-            currentHitIndex = -1;
+        if (resultNavigator.isEmpty()) {
             lineNumberHighlightLabel.setText("");
             updateFileMatchesLabel();
             updateHitButtons();
             return;
         }
-        int safeIndex = Math.max(0, Math.min(currentHits.size() - 1, index));
-        currentHitIndex = safeIndex;
-        Hit hit = currentHits.get(safeIndex);
+        int safeIndex = resultNavigator.selectIndex(index);
+        SearchResultNavigator.Hit hit = resultNavigator.hitAt(safeIndex);
         contentArea.requestFocus();
         contentArea.selectRange(hit.start(), hit.end());
         int line = lineFromOffsetInContent(hit.start());
@@ -336,31 +318,31 @@ public class MainController {
     }
 
     private void gotoNextHit() {
-        if (currentHits.isEmpty()) {
+        if (resultNavigator.isEmpty()) {
             return;
         }
-        if (currentHitIndex >= 0 && currentHitIndex < currentHits.size() - 1) {
-            focusHit(currentHitIndex + 1);
+        SearchResultNavigator.Navigation navigation = resultNavigator.next(
+                files.indexOf(fileTable.getSelectionModel().getSelectedItem()), files.size());
+        if (navigation.fileDirection() == null) {
+            focusHit(navigation.hitIndex());
             return;
         }
         // Дошли до конца текущего файла: переходим к первому совпадению следующего файла.
-        if (!moveToAdjacentFile(+1)) {
-            focusHit(0);
-        }
+        moveToAdjacentFile(navigation.fileDirection());
     }
 
     private void gotoPrevHit() {
-        if (currentHits.isEmpty()) {
+        if (resultNavigator.isEmpty()) {
             return;
         }
-        if (currentHitIndex > 0) {
-            focusHit(currentHitIndex - 1);
+        SearchResultNavigator.Navigation navigation = resultNavigator.previous(
+                files.indexOf(fileTable.getSelectionModel().getSelectedItem()), files.size());
+        if (navigation.fileDirection() == null) {
+            focusHit(navigation.hitIndex());
             return;
         }
         // Дошли до начала текущего файла: переходим к последнему совпадению предыдущего файла.
-        if (!moveToAdjacentFile(-1)) {
-            focusHit(currentHits.size() - 1);
-        }
+        moveToAdjacentFile(navigation.fileDirection());
     }
 
     /**
@@ -384,14 +366,14 @@ public class MainController {
         }
 
         // После смены файла ставим курсор на нужный край списка совпадений.
-        pendingHitIndex = direction > 0 ? 0 : Integer.MAX_VALUE;
+        resultNavigator.setPendingHitForFileDirection(direction);
         fileTable.getSelectionModel().select(nextIndex);
         fileTable.scrollTo(nextIndex);
         return true;
     }
 
     private void updateHitButtons() {
-        boolean hasHits = !currentHits.isEmpty();
+        boolean hasHits = !resultNavigator.isEmpty();
         prevHitButton.setDisable(!hasHits || searchButton.isDisable());
         nextHitButton.setDisable(!hasHits || searchButton.isDisable());
     }
@@ -721,8 +703,7 @@ public class MainController {
         lineNumberLabel.setText("");
         lineNumberHighlightLabel.setText("");
         contentArea.replaceText(0, contentArea.getLength(), "");
-        currentHits.clear();
-        currentHitIndex = -1;
+        resultNavigator.clear();
         updateFileMatchesLabel();
         allResults.clear();
         setRunning(true);
@@ -771,12 +752,12 @@ public class MainController {
     }
 
     private void updateFileMatchesLabel() {
-        int total = currentHits.size();
+        int total = resultNavigator.hits().size();
         if (total <= 0) {
             fileMatchesLabel.setText("Совпадений в файле: 0");
             return;
         }
-        int current = currentHitIndex >= 0 ? currentHitIndex + 1 : 1;
+        int current = resultNavigator.currentHitIndex() >= 0 ? resultNavigator.currentHitIndex() + 1 : 1;
         fileMatchesLabel.setText("Совпадений в файле: " + total + " (текущее: " + current + ")");
     }
 
