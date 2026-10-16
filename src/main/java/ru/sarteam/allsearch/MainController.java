@@ -123,6 +123,8 @@ public class MainController {
     private boolean lastCaseSensitive;
     private boolean applyingFontFromHistory;
     private boolean suppressFontHistoryEvents;
+    private List<String> allFontFamilies = List.of();
+    private boolean updatingFontFamilyItems;
     private final List<int[]> currentHits = new ArrayList<>();
     private int currentHitIndex = -1;
     /** Отложенный индекс совпадения, который нужно выставить после смены файла. */
@@ -395,6 +397,8 @@ public class MainController {
         List<String> families = Font.getFamilies().stream()
                 .sorted(Comparator.naturalOrder())
                 .toList();
+        allFontFamilies = families;
+        fontFamilyCombo.setEditable(true);
         fontFamilyCombo.getItems().setAll(families);
 
         if (families.contains(DEFAULT_FONT_FAMILY)) {
@@ -407,6 +411,20 @@ public class MainController {
                 new SpinnerValueFactory.IntegerSpinnerValueFactory(8, 72, DEFAULT_FONT_SIZE, 1);
         fontSizeSpinner.setValueFactory(valueFactory);
 
+        if (fontFamilyCombo.getEditor() != null) {
+            fontFamilyCombo.getEditor().textProperty().addListener((obs, oldText, newText) -> {
+                if (!updatingFontFamilyItems) {
+                    filterFontFamilies(newText);
+                }
+            });
+        }
+        fontFamilyCombo.showingProperty().addListener((obs, wasShowing, isShowing) -> {
+            if (isShowing) {
+                String query = fontFamilyCombo.getEditor() == null ? "" : fontFamilyCombo.getEditor().getText();
+                filterFontFamilies(query);
+            }
+        });
+
         fontHistoryCombo.valueProperty().addListener((obs, oldV, newV) -> {
             if (suppressFontHistoryEvents) {
                 return;
@@ -418,6 +436,9 @@ public class MainController {
 
         fontFamilyCombo.valueProperty().addListener((obs, oldV, newV) -> {
             if (newV != null && !newV.isBlank()) {
+                if (!allFontFamilies.contains(newV)) {
+                    return;
+                }
                 applyContentFont(newV, currentFontSize());
                 if (!applyingFontFromHistory) {
                     rememberFontSelection();
@@ -433,6 +454,35 @@ public class MainController {
             }
         });
 
+    }
+
+    private void filterFontFamilies(String query) {
+        String q = query == null ? "" : query.trim().toLowerCase();
+        List<String> filtered;
+        if (q.isEmpty()) {
+            filtered = allFontFamilies;
+        } else {
+            filtered = allFontFamilies.stream()
+                    .filter(name -> name.toLowerCase().contains(q))
+                    .toList();
+        }
+
+        String editorText = fontFamilyCombo.getEditor() == null ? "" : fontFamilyCombo.getEditor().getText();
+        updatingFontFamilyItems = true;
+        try {
+            fontFamilyCombo.getItems().setAll(filtered);
+            // Важно: не трогаем value/selection, иначе ComboBox перетирает ввод пользователя.
+            if (fontFamilyCombo.getEditor() != null) {
+                fontFamilyCombo.getEditor().setText(editorText);
+                fontFamilyCombo.getEditor().positionCaret(editorText.length());
+            }
+        } finally {
+            updatingFontFamilyItems = false;
+        }
+
+        if (!fontFamilyCombo.isShowing()) {
+            fontFamilyCombo.show();
+        }
     }
 
     private String currentFontFamily() {
