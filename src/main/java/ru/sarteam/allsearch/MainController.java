@@ -18,6 +18,7 @@ import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.scene.control.Tooltip;
 import javafx.scene.input.MouseButton;
+import javafx.scene.input.ScrollEvent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.text.Font;
@@ -121,6 +122,10 @@ public class MainController {
         contentRow.getChildren().add(contentArea);
         // Ширина ряда подстраивается под размер панели (см. updateRowWidth).
         textScrollPane.viewportBoundsProperty().addListener((obs, oldBounds, newBounds) -> updateRowWidth());
+        // На macOS CodeArea может перехватывать события тачпада.
+        // Принудительно прокручиваем внешний ScrollPane, чтобы скролл работал
+        // одинаково над номерами строк и над текстом.
+        contentRow.addEventFilter(ScrollEvent.SCROLL, this::forwardScrollToPane);
 
         // Выделение и копирование текста в CodeArea.
         ContextMenu copyMenu = new ContextMenu();
@@ -164,10 +169,11 @@ public class MainController {
             return;
         }
         try {
-            String text = SearchEngine.readFileContent(file);
+            String text = normalizeLineEndings(SearchEngine.readFileContent(file));
             if (text.length() > MAX_DISPLAY_CHARS) {
+                int fullLength = text.length();
                 text = text.substring(0, MAX_DISPLAY_CHARS)
-                        + "\n\n… (файл обрезан для отображения: всего символов " + text.length() + ")";
+                        + "\n\n… (файл обрезан для отображения: всего символов " + fullLength + ")";
             }
             int lineCount = countLines(text);
             lineNumberLabel.setText(buildLineNumbers(lineCount));
@@ -190,6 +196,14 @@ public class MainController {
             contentArea.replaceText(0, contentArea.getLength(), "");
             statusLabel.setText("Не удалось прочитать файл: " + e.getMessage());
         }
+    }
+
+    /**
+     * RichTextFX хранит текст с переносом '\n'; если оставить CRLF, длины
+     * документа и StyleSpans могут разойтись, что приводит к IOBE.
+     */
+    private static String normalizeLineEndings(String text) {
+        return text.replace("\r\n", "\n").replace('\r', '\n');
     }
 
     /** Число строк в тексте (считает символы '\n'). */
@@ -225,6 +239,45 @@ public class MainController {
         double rowWidth = Math.max(viewportWidth, rowContentWidth);
         contentRow.setPrefWidth(rowWidth);
         contentRow.setMinWidth(rowWidth);
+    }
+
+    /**
+     * Пробрасывает скролл тачпада/колеса в ScrollPane.
+     * Нужно из-за того, что RichTextFX CodeArea может съедать ScrollEvent.
+     */
+    private void forwardScrollToPane(ScrollEvent event) {
+        if (textScrollPane.getContent() == null) {
+            return;
+        }
+
+        double contentH = textScrollPane.getContent().getBoundsInLocal().getHeight();
+        double viewportH = textScrollPane.getViewportBounds().getHeight();
+        double contentW = textScrollPane.getContent().getBoundsInLocal().getWidth();
+        double viewportW = textScrollPane.getViewportBounds().getWidth();
+
+        boolean moved = false;
+
+        if (contentH > viewportH && event.getDeltaY() != 0) {
+            double pixelRange = Math.max(1.0, contentH - viewportH);
+            double delta = -event.getDeltaY() / pixelRange;
+            textScrollPane.setVvalue(clamp01(textScrollPane.getVvalue() + delta));
+            moved = true;
+        }
+
+        if (contentW > viewportW && event.getDeltaX() != 0) {
+            double pixelRange = Math.max(1.0, contentW - viewportW);
+            double delta = -event.getDeltaX() / pixelRange;
+            textScrollPane.setHvalue(clamp01(textScrollPane.getHvalue() + delta));
+            moved = true;
+        }
+
+        if (moved) {
+            event.consume();
+        }
+    }
+
+    private static double clamp01(double value) {
+        return Math.max(0.0, Math.min(1.0, value));
     }
 
     /** Ширина самой длинной строки в пикселях (для расчёта ширины ряда). */
