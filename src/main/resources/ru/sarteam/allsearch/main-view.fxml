@@ -46,7 +46,6 @@
                 <Label text="Шрифт:"/>
                 <ComboBox fx:id="fontFamilyCombo" prefWidth="180.0"/>
                 <Spinner fx:id="fontSizeSpinner" prefWidth="90.0" editable="true"/>
-                <ComboBox fx:id="fontHistoryCombo" prefWidth="220.0" promptText="История шрифта"/>
             </HBox>
         </VBox>
     </top>
