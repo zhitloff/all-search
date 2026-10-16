@@ -3,6 +3,7 @@ package ru.sarteam.allsearch;
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Scene;
+import javafx.scene.image.Image;
 import javafx.stage.Stage;
 
 import java.io.IOException;
@@ -19,6 +20,7 @@ public class MainApplication extends Application {
         scene.getStylesheets().add(MainApplication.class.getResource("search-highlight.css").toExternalForm());
         scene.getStylesheets().add(MainApplication.class.getResource("theme-light.css").toExternalForm());
         stage.setTitle("all-search — поиск по тексту в файлах");
+        stage.getIcons().setAll(new Image(MainApplication.class.getResourceAsStream("icons/all-search.png")));
         stage.setMinWidth(640);
         stage.setMinHeight(400);
         stage.setScene(scene);

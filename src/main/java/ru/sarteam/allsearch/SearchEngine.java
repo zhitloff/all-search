@@ -143,7 +143,7 @@ public final class SearchEngine {
         } catch (IOException e) {
             return; // битые или занятые файлы пропускаем
         }
-        if (options.textOnly() && isBinary(bytes)) {
+        if (options.textOnly() && isBinary(bytes) && !hasUtf16Bom(bytes)) {
             return;
         }
         String content = decode(bytes);
@@ -215,6 +215,11 @@ public final class SearchEngine {
             }
         }
         return false;
+    }
+
+    private static boolean hasUtf16Bom(byte[] bytes) {
+        return bytes.length >= 2 && (((bytes[0] & 0xFF) == 0xFF && (bytes[1] & 0xFF) == 0xFE)
+                || ((bytes[0] & 0xFF) == 0xFE && (bytes[1] & 0xFF) == 0xFF));
     }
 
     private static String decode(byte[] bytes) {
