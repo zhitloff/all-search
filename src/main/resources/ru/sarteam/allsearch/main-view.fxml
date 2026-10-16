@@ -25,7 +25,7 @@
             </padding>
             <HBox spacing="8.0" alignment="CENTER_LEFT">
                 <Label text="Папка:"/>
-                <TextField fx:id="directoryField" HBox.hgrow="ALWAYS" promptText="Путь к папке для поиска"/>
+                <ComboBox fx:id="directoryField" HBox.hgrow="ALWAYS" editable="true" promptText="Путь к папке для поиска"/>
                 <Button fx:id="browseButton" text="Обзор…" onAction="#onBrowse"/>
             </HBox>
             <HBox spacing="8.0" alignment="CENTER_LEFT">

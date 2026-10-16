@@ -62,7 +62,7 @@ import java.util.regex.PatternSyntaxException;
 public class MainController {
 
     @FXML
-    private TextField directoryField;
+    private ComboBox<String> directoryField;
     @FXML
     private TextField queryField;
     @FXML
@@ -104,10 +104,11 @@ public class MainController {
 
     private static final int MAX_DISPLAY_CHARS = 2_000_000;
     private static final int MAX_HIGHLIGHTS = 5_000;
+    private static final int DIRECTORY_HISTORY_LIMIT = 20;
     private static final int MASK_HISTORY_LIMIT = 20;
     private static final Path MASK_HISTORY_FILE = Path.of(
             System.getProperty("user.home"), ".all-search", "mask-history.json");
-    private static final String DEFAULT_FONT_FAMILY = "Tahoma";
+    private static final String DEFAULT_FONT_FAMILY = "monospace";
     private static final int DEFAULT_FONT_SIZE = 14;
 
     private final ObservableList<Path> files = FXCollections.observableArrayList();
@@ -152,8 +153,9 @@ public class MainController {
         // одинаково над номерами строк и над текстом.
         contentRow.addEventFilter(ScrollEvent.SCROLL, this::forwardScrollToPane);
 
+        directoryField.setEditable(true);
         maskField.setEditable(true);
-        loadMaskHistory();
+        loadFieldHistories();
         initFontControls();
         applyContentFont(currentFontFamily(), currentFontSize());
 
@@ -570,23 +572,31 @@ public class MainController {
     private void onBrowse() {
         DirectoryChooser chooser = new DirectoryChooser();
         chooser.setTitle("Выберите папку для поиска");
-        if (!directoryField.getText().isBlank()) {
-            Path current = Paths.get(directoryField.getText());
-            if (Files.isDirectory(current)) {
-                chooser.setInitialDirectory(current.toFile());
+        String currentDirectory = currentDirectoryText();
+        if (!currentDirectory.isBlank()) {
+            try {
+                Path current = Paths.get(currentDirectory);
+                if (Files.isDirectory(current)) {
+                    chooser.setInitialDirectory(current.toFile());
+                }
+            } catch (RuntimeException ignored) {
+                // Некорректный путь в поле: просто не выставляем initialDirectory.
             }
         }
         File dir = chooser.showDialog(directoryField.getScene().getWindow());
         if (dir != null) {
-            directoryField.setText(dir.getAbsolutePath());
+            String selected = dir.getAbsolutePath();
+            directoryField.getEditor().setText(selected);
+            rememberDirectory(selected);
         }
     }
 
     @FXML
     private void onSearch() {
         Path root;
+        String rootText = currentDirectoryText();
         try {
-            root = Paths.get(directoryField.getText().trim());
+            root = Paths.get(rootText.trim());
         } catch (RuntimeException e) {
             statusLabel.setText("Указан некорректный путь к папке.");
             return;
@@ -615,8 +625,16 @@ public class MainController {
                 parseMasks(currentMaskText()),
                 textOnlyCheck.isSelected(),
                 0);
+        rememberDirectory(root.toString());
         rememberMask(currentMaskText());
         startSearch(root, options);
+    }
+
+    private String currentDirectoryText() {
+        if (directoryField.getEditor() != null) {
+            return directoryField.getEditor().getText();
+        }
+        return directoryField.getValue() == null ? "" : directoryField.getValue();
     }
 
     private String currentMaskText() {
@@ -637,17 +655,41 @@ public class MainController {
             maskField.getItems().remove(MASK_HISTORY_LIMIT, maskField.getItems().size());
         }
         maskField.setValue(mask);
-        saveMaskHistory();
+        saveFieldHistories();
     }
 
-    private void loadMaskHistory() {
+    private void rememberDirectory(String rawDirectory) {
+        String directory = rawDirectory == null ? "" : rawDirectory.trim();
+        if (directory.isEmpty()) {
+            return;
+        }
+        directoryField.getItems().remove(directory);
+        directoryField.getItems().add(0, directory);
+        if (directoryField.getItems().size() > DIRECTORY_HISTORY_LIMIT) {
+            directoryField.getItems().remove(DIRECTORY_HISTORY_LIMIT, directoryField.getItems().size());
+        }
+        directoryField.setValue(directory);
+        saveFieldHistories();
+    }
+
+    private void loadFieldHistories() {
         if (!Files.isRegularFile(MASK_HISTORY_FILE)) {
             return;
         }
         try {
             String json = Files.readString(MASK_HISTORY_FILE, StandardCharsets.UTF_8);
-            List<String> items = parseMaskHistoryJson(json);
-            for (String mask : items) {
+
+            for (String path : parseJsonStringArrayByKey(json, "directories")) {
+                String trimmed = path == null ? "" : path.trim();
+                if (!trimmed.isEmpty() && !directoryField.getItems().contains(trimmed)) {
+                    directoryField.getItems().add(trimmed);
+                }
+                if (directoryField.getItems().size() >= DIRECTORY_HISTORY_LIMIT) {
+                    break;
+                }
+            }
+
+            for (String mask : parseJsonStringArrayByKey(json, "masks")) {
                 String trimmed = mask == null ? "" : mask.trim();
                 if (!trimmed.isEmpty() && !maskField.getItems().contains(trimmed)) {
                     maskField.getItems().add(trimmed);
@@ -656,19 +698,85 @@ public class MainController {
                     break;
                 }
             }
+
+            // Совместимость со старым форматом: {"masks":[...]}
+            if (maskField.getItems().isEmpty()) {
+                List<String> legacyMasks = parseMaskHistoryJson(json);
+                for (String mask : legacyMasks) {
+                    String trimmed = mask == null ? "" : mask.trim();
+                    if (!trimmed.isEmpty() && !maskField.getItems().contains(trimmed)) {
+                        maskField.getItems().add(trimmed);
+                    }
+                    if (maskField.getItems().size() >= MASK_HISTORY_LIMIT) {
+                        break;
+                    }
+                }
+            }
         } catch (IOException ignored) {
-            // История масок не критична: при ошибке просто стартуем без неё.
+            // История полей не критична: при ошибке просто стартуем без неё.
         }
     }
 
-    private void saveMaskHistory() {
+    private void saveFieldHistories() {
         try {
             Files.createDirectories(MASK_HISTORY_FILE.getParent());
-            String json = toMaskHistoryJson(maskField.getItems());
+            String json = toFieldHistoryJson(directoryField.getItems(), maskField.getItems());
             Files.writeString(MASK_HISTORY_FILE, json, StandardCharsets.UTF_8);
         } catch (IOException ignored) {
-            // История масок не критична для основной функциональности.
+            // История полей не критична для основной функциональности.
         }
+    }
+
+    private static String toFieldHistoryJson(List<String> directories, List<String> masks) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("{\n  \"directories\": [");
+        for (int i = 0; i < directories.size(); i++) {
+            if (i > 0) {
+                sb.append(", ");
+            }
+            sb.append('"').append(escapeJson(directories.get(i))).append('"');
+        }
+        sb.append("],\n  \"masks\": [");
+        for (int i = 0; i < masks.size(); i++) {
+            if (i > 0) {
+                sb.append(", ");
+            }
+            sb.append('"').append(escapeJson(masks.get(i))).append('"');
+        }
+        sb.append("]\n}\n");
+        return sb.toString();
+    }
+
+    private static List<String> parseJsonStringArrayByKey(String json, String key) {
+        if (json == null || json.isBlank()) {
+            return List.of();
+        }
+        int keyPos = json.indexOf('"' + key + '"');
+        if (keyPos < 0) {
+            return List.of();
+        }
+        int arrayStart = json.indexOf('[', keyPos);
+        if (arrayStart < 0) {
+            return List.of();
+        }
+        int depth = 0;
+        int arrayEnd = -1;
+        for (int i = arrayStart; i < json.length(); i++) {
+            char ch = json.charAt(i);
+            if (ch == '[') {
+                depth++;
+            } else if (ch == ']') {
+                depth--;
+                if (depth == 0) {
+                    arrayEnd = i;
+                    break;
+                }
+            }
+        }
+        if (arrayEnd <= arrayStart) {
+            return List.of();
+        }
+        return parseMaskHistoryJson("{\"masks\": [" + json.substring(arrayStart + 1, arrayEnd) + "]}");
     }
 
     private static String toMaskHistoryJson(List<String> masks) {
