@@ -6,6 +6,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /** Персистентное хранилище истории полей поиска. */
 final class HistoryStore {
@@ -37,12 +39,40 @@ final class HistoryStore {
     }
 
     void save(List<String> directories, List<String> masks) {
+        save(directories, masks, loadFontSettings());
+    }
+
+    FontSettingsStore.Settings loadFontSettings() {
         try {
-            Files.createDirectories(file.getParent());
+            String json = Files.readString(file, StandardCharsets.UTF_8);
+            Matcher family = Pattern.compile("\"fontFamily\"\\s*:\\s*(\"(?:\\\\.|[^\"\\\\])*\")").matcher(json);
+            Matcher size = Pattern.compile("\"fontSize\"\\s*:\\s*(-?\\d+)").matcher(json);
+            if (family.find()) {
+                return new FontSettingsStore.Settings(parseStrings(family.group(1)).getFirst(),
+                        size.find() ? Integer.parseInt(size.group(1)) : 14);
+            }
+        } catch (IOException | IllegalArgumentException ignored) {
+            // Старый формат истории может не содержать настроек шрифта.
+        }
+        return null;
+    }
+
+    void saveFontSettings(FontSettingsStore.Settings settings) {
+        History history = load();
+        save(history.directories(), history.masks(), settings);
+    }
+
+    private void save(List<String> directories, List<String> masks, FontSettingsStore.Settings settings) {
+        try {
+            Files.createDirectories(file.toAbsolutePath().getParent());
             StringBuilder json = new StringBuilder("{\n  \"directories\": ");
             appendArray(json, directories);
             json.append(",\n  \"masks\": ");
             appendArray(json, masks);
+            if (settings != null) {
+                json.append(",\n  \"fontFamily\": \"").append(escape(settings.family())).append('"');
+                json.append(",\n  \"fontSize\": ").append(settings.size());
+            }
             json.append("\n}\n");
             Files.writeString(file, json, StandardCharsets.UTF_8);
         } catch (IOException ignored) {
@@ -88,6 +118,9 @@ final class HistoryStore {
     }
 
     private static List<String> parseLegacyArray(String json) {
+        if (!json.stripLeading().startsWith("[")) {
+            return List.of();
+        }
         int start = json.indexOf('[');
         int end = json.lastIndexOf(']');
         return start < 0 || end <= start ? List.of() : parseStrings(json.substring(start + 1, end));

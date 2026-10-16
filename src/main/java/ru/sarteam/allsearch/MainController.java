@@ -100,6 +100,15 @@ public class MainController {
     private final SearchOptionsFactory searchOptionsFactory = new SearchOptionsFactory();
     private FileContentView contentView;
     private final HistoryStore historyStore = new HistoryStore(HISTORY_FILE);
+    private final FontSettingsStore fontSettingsStore;
+
+    public MainController() {
+        this(new FontSettingsStore(HISTORY_FILE));
+    }
+
+    MainController(FontSettingsStore fontSettingsStore) {
+        this.fontSettingsStore = fontSettingsStore;
+    }
 
     @FXML
     private void initialize() {
@@ -219,6 +228,7 @@ public class MainController {
     }
 
     private void initFontControls() {
+        FontSettingsStore.Settings settings = fontSettingsStore.load();
         List<String> families = Font.getFamilies().stream()
                 .sorted(Comparator.naturalOrder())
                 .toList();
@@ -226,14 +236,16 @@ public class MainController {
         fontFamilyCombo.setEditable(false);
         fontFamilyCombo.getItems().setAll(families);
 
-        if (families.contains(DEFAULT_FONT_FAMILY)) {
+        if (families.contains(settings.family())) {
+            fontFamilyCombo.getSelectionModel().select(settings.family());
+        } else if (families.contains(DEFAULT_FONT_FAMILY)) {
             fontFamilyCombo.getSelectionModel().select(DEFAULT_FONT_FAMILY);
         } else if (!families.isEmpty()) {
             fontFamilyCombo.getSelectionModel().selectFirst();
         }
 
         SpinnerValueFactory.IntegerSpinnerValueFactory valueFactory =
-                new SpinnerValueFactory.IntegerSpinnerValueFactory(8, 72, DEFAULT_FONT_SIZE, 1);
+                new SpinnerValueFactory.IntegerSpinnerValueFactory(8, 72, settings.size(), 1);
         fontSizeSpinner.setValueFactory(valueFactory);
 
         fontFamilyCombo.valueProperty().addListener((obs, oldV, newV) -> {
@@ -242,11 +254,13 @@ public class MainController {
                     return;
                 }
                 applyContentFont(newV, currentFontSize());
+                fontSettingsStore.save(newV, currentFontSize());
             }
         });
         fontSizeSpinner.valueProperty().addListener((obs, oldV, newV) -> {
             if (newV != null) {
                 applyContentFont(currentFontFamily(), newV);
+                fontSettingsStore.save(currentFontFamily(), newV);
             }
         });
 
