@@ -78,6 +78,8 @@ public class MainController {
     @FXML
     private Spinner<Integer> fontSizeSpinner;
     @FXML
+    private ComboBox<String> fontHistoryCombo;
+    @FXML
     private Button searchButton;
     @FXML
     private Button prevHitButton;
@@ -106,6 +108,7 @@ public class MainController {
     private static final int MAX_HIGHLIGHTS = 5_000;
     private static final int DIRECTORY_HISTORY_LIMIT = 20;
     private static final int MASK_HISTORY_LIMIT = 20;
+    private static final int FONT_HISTORY_LIMIT = 20;
     private static final Path MASK_HISTORY_FILE = Path.of(
             System.getProperty("user.home"), ".all-search", "mask-history.json");
     private static final String DEFAULT_FONT_FAMILY = "monospace";
@@ -118,6 +121,8 @@ public class MainController {
     private String lastQuery;
     private boolean lastRegex;
     private boolean lastCaseSensitive;
+    private boolean applyingFontFromHistory;
+    private boolean suppressFontHistoryEvents;
     private final List<int[]> currentHits = new ArrayList<>();
     private int currentHitIndex = -1;
     /** Отложенный индекс совпадения, который нужно выставить после смены файла. */
@@ -155,9 +160,15 @@ public class MainController {
 
         directoryField.setEditable(true);
         maskField.setEditable(true);
+        fontHistoryCombo.setEditable(false);
         loadFieldHistories();
         initFontControls();
-        applyContentFont(currentFontFamily(), currentFontSize());
+        if (!fontHistoryCombo.getItems().isEmpty()) {
+            applyFontFromHistoryEntry(fontHistoryCombo.getItems().get(0));
+        } else {
+            applyContentFont(currentFontFamily(), currentFontSize());
+            rememberFontSelection();
+        }
 
         // Выделение и копирование текста в CodeArea.
         ContextMenu copyMenu = new ContextMenu();
@@ -396,16 +407,32 @@ public class MainController {
                 new SpinnerValueFactory.IntegerSpinnerValueFactory(8, 72, DEFAULT_FONT_SIZE, 1);
         fontSizeSpinner.setValueFactory(valueFactory);
 
+        fontHistoryCombo.valueProperty().addListener((obs, oldV, newV) -> {
+            if (suppressFontHistoryEvents) {
+                return;
+            }
+            if (newV != null && !newV.isBlank()) {
+                applyFontFromHistoryEntry(newV);
+            }
+        });
+
         fontFamilyCombo.valueProperty().addListener((obs, oldV, newV) -> {
             if (newV != null && !newV.isBlank()) {
                 applyContentFont(newV, currentFontSize());
+                if (!applyingFontFromHistory) {
+                    rememberFontSelection();
+                }
             }
         });
         fontSizeSpinner.valueProperty().addListener((obs, oldV, newV) -> {
             if (newV != null) {
                 applyContentFont(currentFontFamily(), newV);
+                if (!applyingFontFromHistory) {
+                    rememberFontSelection();
+                }
             }
         });
+
     }
 
     private String currentFontFamily() {
@@ -658,6 +685,58 @@ public class MainController {
         saveFieldHistories();
     }
 
+    private void rememberFontSelection() {
+        String family = currentFontFamily();
+        int size = currentFontSize();
+        String entry = family + "|" + size;
+
+        suppressFontHistoryEvents = true;
+        try {
+            fontHistoryCombo.getItems().remove(entry);
+            fontHistoryCombo.getItems().add(0, entry);
+            if (fontHistoryCombo.getItems().size() > FONT_HISTORY_LIMIT) {
+                fontHistoryCombo.getItems().remove(FONT_HISTORY_LIMIT, fontHistoryCombo.getItems().size());
+            }
+            if (!entry.equals(fontHistoryCombo.getValue())) {
+                fontHistoryCombo.setValue(entry);
+            }
+        } finally {
+            suppressFontHistoryEvents = false;
+        }
+        saveFieldHistories();
+    }
+
+    private void applyFontFromHistoryEntry(String entry) {
+        int sep = entry.lastIndexOf('|');
+        if (sep <= 0 || sep >= entry.length() - 1) {
+            return;
+        }
+        String family = entry.substring(0, sep).trim();
+        String sizeText = entry.substring(sep + 1).trim();
+        int size;
+        try {
+            size = Integer.parseInt(sizeText);
+        } catch (NumberFormatException e) {
+            return;
+        }
+        if (!fontFamilyCombo.getItems().contains(family)) {
+            return;
+        }
+        size = Math.max(8, Math.min(72, size));
+
+        applyingFontFromHistory = true;
+        try {
+            fontFamilyCombo.setValue(family);
+            if (fontSizeSpinner.getValueFactory() != null) {
+                fontSizeSpinner.getValueFactory().setValue(size);
+            }
+            applyContentFont(family, size);
+        } finally {
+            applyingFontFromHistory = false;
+        }
+        rememberFontSelection();
+    }
+
     private void rememberDirectory(String rawDirectory) {
         String directory = rawDirectory == null ? "" : rawDirectory.trim();
         if (directory.isEmpty()) {
@@ -699,6 +778,16 @@ public class MainController {
                 }
             }
 
+            for (String font : parseJsonStringArrayByKey(json, "fonts")) {
+                String trimmed = font == null ? "" : font.trim();
+                if (!trimmed.isEmpty() && !fontHistoryCombo.getItems().contains(trimmed)) {
+                    fontHistoryCombo.getItems().add(trimmed);
+                }
+                if (fontHistoryCombo.getItems().size() >= FONT_HISTORY_LIMIT) {
+                    break;
+                }
+            }
+
             // Совместимость со старым форматом: {"masks":[...]}
             if (maskField.getItems().isEmpty()) {
                 List<String> legacyMasks = parseMaskHistoryJson(json);
@@ -720,14 +809,14 @@ public class MainController {
     private void saveFieldHistories() {
         try {
             Files.createDirectories(MASK_HISTORY_FILE.getParent());
-            String json = toFieldHistoryJson(directoryField.getItems(), maskField.getItems());
+            String json = toFieldHistoryJson(directoryField.getItems(), maskField.getItems(), fontHistoryCombo.getItems());
             Files.writeString(MASK_HISTORY_FILE, json, StandardCharsets.UTF_8);
         } catch (IOException ignored) {
             // История полей не критична для основной функциональности.
         }
     }
 
-    private static String toFieldHistoryJson(List<String> directories, List<String> masks) {
+    private static String toFieldHistoryJson(List<String> directories, List<String> masks, List<String> fonts) {
         StringBuilder sb = new StringBuilder();
         sb.append("{\n  \"directories\": [");
         for (int i = 0; i < directories.size(); i++) {
@@ -742,6 +831,13 @@ public class MainController {
                 sb.append(", ");
             }
             sb.append('"').append(escapeJson(masks.get(i))).append('"');
+        }
+        sb.append("],\n  \"fonts\": [");
+        for (int i = 0; i < fonts.size(); i++) {
+            if (i > 0) {
+                sb.append(", ");
+            }
+            sb.append('"').append(escapeJson(fonts.get(i))).append('"');
         }
         sb.append("]\n}\n");
         return sb.toString();
@@ -954,6 +1050,7 @@ public class MainController {
         maskField.setDisable(running);
         fontFamilyCombo.setDisable(running);
         fontSizeSpinner.setDisable(running);
+        fontHistoryCombo.setDisable(running);
         regexCheck.setDisable(running);
         caseCheck.setDisable(running);
         textOnlyCheck.setDisable(running);
