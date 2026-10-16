@@ -123,6 +123,7 @@ public class MainController {
     private List<String> allFontFamilies = List.of();
     private final SearchResultNavigator resultNavigator = new SearchResultNavigator();
     private final SyntaxHighlighter syntaxHighlighter = new SyntaxHighlighter();
+    private final SearchOptionsFactory searchOptionsFactory = new SearchOptionsFactory();
     private LineNumberView lineNumbers;
 
     /** RichTextFX-область для показа содержимого файла (создаётся в {@link #initialize()}). */
@@ -574,21 +575,18 @@ public class MainController {
             statusLabel.setText("Введите текст для поиска.");
             return;
         }
-        if (regexCheck.isSelected()) {
-            try {
-                Pattern.compile(query);
-            } catch (PatternSyntaxException e) {
-                statusLabel.setText("Некорректное регулярное выражение: " + e.getDescription());
-                return;
-            }
+        SearchEngine.Options options;
+        try {
+            options = searchOptionsFactory.create(
+                    query,
+                    regexCheck.isSelected(),
+                    caseCheck.isSelected(),
+                    currentMaskText(),
+                    textOnlyCheck.isSelected());
+        } catch (PatternSyntaxException e) {
+            statusLabel.setText("Некорректное регулярное выражение: " + e.getDescription());
+            return;
         }
-        SearchEngine.Options options = new SearchEngine.Options(
-                query,
-                regexCheck.isSelected(),
-                caseCheck.isSelected(),
-                parseMasks(currentMaskText()),
-                textOnlyCheck.isSelected(),
-                0);
         rememberDirectory(root.toString());
         rememberMask(currentMaskText());
         startSearch(root, options);
@@ -630,19 +628,6 @@ public class MainController {
 
     private void saveFieldHistories() {
         historyStore.save(directoryField.getItems(), maskField.getItems());
-    }
-
-    private static List<String> parseMasks(String text) {
-        if (text == null || text.isBlank()) {
-            return List.of();
-        }
-        List<String> masks = new ArrayList<>();
-        for (String part : text.split("[;,]\\s*|\\s+")) {
-            if (!part.isBlank()) {
-                masks.add(part);
-            }
-        }
-        return masks;
     }
 
     private void startSearch(Path root, SearchEngine.Options options) {
