@@ -23,8 +23,8 @@ final class FileContentView {
     private final SyntaxHighlighter highlighter = new SyntaxHighlighter();
     private final ScrollPane scroll;
     private final HBox row;
-    private String family = "monospace";
-    private int size = 14;
+    private String family = FontConstants.DEFAULT_FONT_FAMILY;
+    private int size = FontConstants.DEFAULT_FONT_SIZE;
     private int lineCount = 1;
     private double rowWidth;
     private int activeOffset = -1;
@@ -93,7 +93,7 @@ final class FileContentView {
     }
 
     void setFont(String family, int size) {
-        this.family = family == null || family.isBlank() ? "monospace" : family;
+        this.family = family == null || family.isBlank() ? FontConstants.DEFAULT_FONT_FAMILY : family;
         this.size = Math.max(8, Math.min(72, size));
         content.setStyle("-fx-font-family: '" + this.family.replace("'", "\\'")
                 + "'; -fx-font-size: " + this.size + "px;");

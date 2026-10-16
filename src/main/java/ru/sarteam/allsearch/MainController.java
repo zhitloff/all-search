@@ -89,9 +89,6 @@ public class MainController {
 
     private static final Path HISTORY_FILE = Path.of(
             System.getProperty("user.home"), ".all-search", "mask-history.json");
-    private static final String DEFAULT_FONT_FAMILY = "monospace";
-    private static final int DEFAULT_FONT_SIZE = 14;
-
     private final ObservableList<Path> files = FXCollections.observableArrayList();
     private SearchTask searchTask;
     private SearchPattern searchPattern = new SearchPattern("", false, false);
@@ -238,8 +235,8 @@ public class MainController {
 
         if (families.contains(settings.family())) {
             fontFamilyCombo.getSelectionModel().select(settings.family());
-        } else if (families.contains(DEFAULT_FONT_FAMILY)) {
-            fontFamilyCombo.getSelectionModel().select(DEFAULT_FONT_FAMILY);
+        } else if (families.contains(FontConstants.DEFAULT_FONT_FAMILY)) {
+            fontFamilyCombo.getSelectionModel().select(FontConstants.DEFAULT_FONT_FAMILY);
         } else if (!families.isEmpty()) {
             fontFamilyCombo.getSelectionModel().selectFirst();
         }
@@ -268,12 +265,12 @@ public class MainController {
 
     private String currentFontFamily() {
         String family = fontFamilyCombo == null ? null : fontFamilyCombo.getValue();
-        return (family == null || family.isBlank()) ? DEFAULT_FONT_FAMILY : family;
+        return (family == null || family.isBlank()) ? FontConstants.DEFAULT_FONT_FAMILY : family;
     }
 
     private int currentFontSize() {
         Integer size = fontSizeSpinner == null ? null : fontSizeSpinner.getValue();
-        return size == null ? DEFAULT_FONT_SIZE : Math.max(8, Math.min(72, size));
+        return size == null ? FontConstants.DEFAULT_FONT_SIZE : Math.max(8, Math.min(72, size));
     }
 
     private void applyContentFont(String family, int size) {

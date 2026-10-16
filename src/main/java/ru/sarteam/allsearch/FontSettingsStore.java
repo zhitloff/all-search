@@ -12,7 +12,9 @@ final class FontSettingsStore {
 
     Settings load() {
         Settings settings = new HistoryStore(file).loadFontSettings();
-        return settings == null ? new Settings("monospace", 14) : settings;
+        return settings == null
+                ? new Settings(FontConstants.DEFAULT_FONT_FAMILY, FontConstants.DEFAULT_FONT_SIZE)
+                : settings;
     }
 
     void save(String family, int size) {
@@ -21,7 +23,7 @@ final class FontSettingsStore {
 
     record Settings(String family, int size) {
         Settings {
-            family = family == null || family.isBlank() ? "monospace" : family;
+            family = family == null || family.isBlank() ? FontConstants.DEFAULT_FONT_FAMILY : family;
             size = Math.max(8, Math.min(72, size));
         }
     }

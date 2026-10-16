@@ -16,9 +16,11 @@ class FontSettingsStoreTest {
     void handlesMissingAndCorruptedSettings() throws Exception {
         Path file = directory.resolve("mask-history.json");
         FontSettingsStore store = new FontSettingsStore(file);
-        assertEquals(new FontSettingsStore.Settings("monospace", 14), store.load());
+        assertEquals(new FontSettingsStore.Settings(
+                FontConstants.DEFAULT_FONT_FAMILY, FontConstants.DEFAULT_FONT_SIZE), store.load());
         Files.writeString(file, "family=Example\nsize=invalid");
-        assertEquals(new FontSettingsStore.Settings("monospace", 14), store.load());
+        assertEquals(new FontSettingsStore.Settings(
+                FontConstants.DEFAULT_FONT_FAMILY, FontConstants.DEFAULT_FONT_SIZE), store.load());
     }
 
     @Test
@@ -47,7 +49,8 @@ class FontSettingsStoreTest {
         Path file = directory.resolve("mask-history.json");
         Files.writeString(file, "[\"*.txt\"]");
         FontSettingsStore fonts = new FontSettingsStore(file);
-        assertEquals(new FontSettingsStore.Settings("monospace", 14), fonts.load());
+        assertEquals(new FontSettingsStore.Settings(
+                FontConstants.DEFAULT_FONT_FAMILY, FontConstants.DEFAULT_FONT_SIZE), fonts.load());
         assertEquals(List.of("*.txt"), new HistoryStore(file).load().masks());
         fonts.save("Other", 20);
         assertEquals(new FontSettingsStore.Settings("Other", 20), fonts.load());

@@ -58,7 +58,7 @@ class FileContentViewTest {
             CodeArea content = (CodeArea) row.getChildren().getLast();
             assertEquals("second", content.getSelectedText());
             Files.delete(file);
-            view.setFont("monospace", 20);
+            view.setFont(FontConstants.DEFAULT_FONT_FAMILY, 20);
             assertEquals("second", content.getSelectedText());
             assertEquals("1\n2\n3", numbers.getText());
             assertEquals(" \n2\n ", highlight.getText());

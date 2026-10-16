@@ -46,7 +46,7 @@ final class LineNumberView {
     }
 
     void setFont(String family, int size) {
-        String safeFamily = family == null || family.isBlank() ? "monospace" : family;
+        String safeFamily = family == null || family.isBlank() ? FontConstants.DEFAULT_FONT_FAMILY : family;
         String escaped = safeFamily.replace("'", "\\'");
         String style = "-fx-font-family: '" + escaped + "'; -fx-font-size: "
                 + Math.max(8, Math.min(72, size)) + "px;";
