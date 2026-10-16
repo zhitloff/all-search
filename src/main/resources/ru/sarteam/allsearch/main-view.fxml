@@ -66,7 +66,7 @@
                 <Insets top="6.0" right="10.0" left="10.0" bottom="10.0"/>
             </padding>
             <Label fx:id="statusLabel" text="Готов к поиску" HBox.hgrow="ALWAYS"/>
-            <ProgressBar fx:id="progressBar" prefWidth="160.0"/>
+            <ProgressBar fx:id="progressBar" prefWidth="160.0" progress="0.0"/>
         </HBox>
     </bottom>
 </BorderPane>

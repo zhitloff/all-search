@@ -98,7 +98,7 @@ public class MainController {
 
     private static final int MAX_DISPLAY_CHARS = 2_000_000;
     private static final int MAX_HIGHLIGHTS = 5_000;
-    private static final String DEFAULT_FONT_FAMILY = "JetBrains Mono";
+    private static final String DEFAULT_FONT_FAMILY = "Tahoma";
     private static final int DEFAULT_FONT_SIZE = 14;
 
     private final ObservableList<Path> files = FXCollections.observableArrayList();
@@ -171,6 +171,7 @@ public class MainController {
 
         fileTable.getSelectionModel().selectedItemProperty().addListener((obs, oldFile, newFile) -> showFileContent(newFile));
 
+        progressBar.setProgress(0.0);
         statusLabel.setText("Укажите папку и текст, затем нажмите «Искать». Двойной щелчок открывает файл.");
     }
 
@@ -520,7 +521,7 @@ public class MainController {
     private void finish(String message) {
         statusLabel.textProperty().unbind();
         progressBar.progressProperty().unbind();
-        progressBar.setProgress(1.0);
+        progressBar.setProgress(0.0);
         setRunning(false);
         statusLabel.setText(message);
     }
