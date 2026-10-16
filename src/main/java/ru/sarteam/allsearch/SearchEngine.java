@@ -4,12 +4,6 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.StringReader;
 import java.io.UncheckedIOException;
-import java.nio.ByteBuffer;
-import java.nio.charset.CharacterCodingException;
-import java.nio.charset.Charset;
-import java.nio.charset.CharsetDecoder;
-import java.nio.charset.CodingErrorAction;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
@@ -34,9 +28,7 @@ public final class SearchEngine {
 
     public static final int DEFAULT_MAX_RESULTS = 100_000;
 
-    private static final Charset WINDOWS_1251 = Charset.forName("windows-1251");
     private static final long MAX_FILE_BYTES = 256L * 1024 * 1024;
-    private static final int BINARY_PROBE = 8192;
 
     /** Параметры одного поиска. */
     public record Options(
@@ -97,7 +89,7 @@ public final class SearchEngine {
      * выбранного файла в правой панели.
      */
     public static String readFileContent(Path file) throws IOException {
-        return decode(Files.readAllBytes(file));
+        return TextFileReader.read(file);
     }
 
     private void walk(Path dir, Options options, Pattern pattern, String needle, List<PathMatcher> matchers,
@@ -149,14 +141,14 @@ public final class SearchEngine {
             if (Files.size(file) > MAX_FILE_BYTES) {
                 return;
             }
-            bytes = Files.readAllBytes(file);
+            bytes = TextFileReader.readBytes(file);
         } catch (IOException e) {
             return; // битые или занятые файлы пропускаем
         }
-        if (options.textOnly() && isBinary(bytes) && !hasUtf16Bom(bytes)) {
+        if (options.textOnly() && TextFileReader.isBinary(bytes) && !TextFileReader.hasUtf16Bom(bytes)) {
             return;
         }
-        String content = decode(bytes);
+        String content = TextFileReader.decodeBytes(bytes);
         int lineNo = 0;
         boolean matchedFileNotified = false;
         try (BufferedReader reader = new BufferedReader(new StringReader(content))) {
@@ -222,46 +214,4 @@ public final class SearchEngine {
         return false;
     }
 
-    private static boolean isBinary(byte[] bytes) {
-        int n = Math.min(bytes.length, BINARY_PROBE);
-        for (int i = 0; i < n; i++) {
-            if (bytes[i] == 0) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static boolean hasUtf16Bom(byte[] bytes) {
-        return bytes.length >= 2 && (((bytes[0] & 0xFF) == 0xFF && (bytes[1] & 0xFF) == 0xFE)
-                || ((bytes[0] & 0xFF) == 0xFE && (bytes[1] & 0xFF) == 0xFF));
-    }
-
-    private static String decode(byte[] bytes) {
-        if (bytes.length >= 3 && (bytes[0] & 0xFF) == 0xEF && (bytes[1] & 0xFF) == 0xBB && (bytes[2] & 0xFF) == 0xBF) {
-            return new String(bytes, 3, bytes.length - 3, StandardCharsets.UTF_8);
-        }
-        if (bytes.length >= 2 && (bytes[0] & 0xFF) == 0xFF && (bytes[1] & 0xFF) == 0xFE) {
-            return new String(bytes, 2, bytes.length - 2, StandardCharsets.UTF_16LE);
-        }
-        if (bytes.length >= 2 && (bytes[0] & 0xFF) == 0xFE && (bytes[1] & 0xFF) == 0xFF) {
-            return new String(bytes, 2, bytes.length - 2, StandardCharsets.UTF_16BE);
-        }
-        if (isValidUtf8(bytes)) {
-            return new String(bytes, StandardCharsets.UTF_8);
-        }
-        return new String(bytes, WINDOWS_1251); // русскоязычный fallback
-    }
-
-    private static boolean isValidUtf8(byte[] bytes) {
-        CharsetDecoder decoder = StandardCharsets.UTF_8.newDecoder()
-                .onMalformedInput(CodingErrorAction.REPORT)
-                .onUnmappableCharacter(CodingErrorAction.REPORT);
-        try {
-            decoder.decode(ByteBuffer.wrap(bytes));
-            return true;
-        } catch (CharacterCodingException e) {
-            return false;
-        }
-    }
 }
