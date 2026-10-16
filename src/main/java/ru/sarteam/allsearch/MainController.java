@@ -36,7 +36,6 @@ import org.fxmisc.richtext.model.StyleSpansBuilder;
 import java.awt.Desktop;
 import java.io.File;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -114,9 +113,7 @@ public class MainController {
 
     private static final int MAX_DISPLAY_CHARS = 2_000_000;
     private static final int MAX_HIGHLIGHTS = 5_000;
-    private static final int DIRECTORY_HISTORY_LIMIT = 20;
-    private static final int MASK_HISTORY_LIMIT = 20;
-    private static final Path MASK_HISTORY_FILE = Path.of(
+    private static final Path HISTORY_FILE = Path.of(
             System.getProperty("user.home"), ".all-search", "mask-history.json");
     private static final String DEFAULT_FONT_FAMILY = "monospace";
     private static final int DEFAULT_FONT_SIZE = 14;
@@ -201,6 +198,7 @@ public class MainController {
     private double rowContentWidth;
     /** Количество строк в тексте, который сейчас показан справа. */
     private int currentLineCount = 1;
+    private final HistoryStore historyStore = new HistoryStore(HISTORY_FILE);
 
     @FXML
     private void initialize() {
@@ -227,7 +225,9 @@ public class MainController {
 
         directoryField.setEditable(true);
         maskField.setEditable(true);
-        loadFieldHistories();
+        HistoryStore.History history = historyStore.load();
+        directoryField.getItems().setAll(history.directories());
+        maskField.getItems().setAll(history.masks());
         initFontControls();
         applyContentFont(currentFontFamily(), currentFontSize());
 
@@ -950,11 +950,7 @@ public class MainController {
         if (mask.isEmpty()) {
             return;
         }
-        maskField.getItems().remove(mask);
-        maskField.getItems().add(0, mask);
-        if (maskField.getItems().size() > MASK_HISTORY_LIMIT) {
-            maskField.getItems().remove(MASK_HISTORY_LIMIT, maskField.getItems().size());
-        }
+        HistoryStore.remember(maskField.getItems(), mask, HistoryStore.MASK_LIMIT);
         maskField.setValue(mask);
         saveFieldHistories();
     }
@@ -964,202 +960,13 @@ public class MainController {
         if (directory.isEmpty()) {
             return;
         }
-        directoryField.getItems().remove(directory);
-        directoryField.getItems().add(0, directory);
-        if (directoryField.getItems().size() > DIRECTORY_HISTORY_LIMIT) {
-            directoryField.getItems().remove(DIRECTORY_HISTORY_LIMIT, directoryField.getItems().size());
-        }
+        HistoryStore.remember(directoryField.getItems(), directory, HistoryStore.DIRECTORY_LIMIT);
         directoryField.setValue(directory);
         saveFieldHistories();
     }
 
-    private void loadFieldHistories() {
-        if (!Files.isRegularFile(MASK_HISTORY_FILE)) {
-            return;
-        }
-        try {
-            String json = Files.readString(MASK_HISTORY_FILE, StandardCharsets.UTF_8);
-
-            for (String path : parseJsonStringArrayByKey(json, "directories")) {
-                String trimmed = path == null ? "" : path.trim();
-                if (!trimmed.isEmpty() && !directoryField.getItems().contains(trimmed)) {
-                    directoryField.getItems().add(trimmed);
-                }
-                if (directoryField.getItems().size() >= DIRECTORY_HISTORY_LIMIT) {
-                    break;
-                }
-            }
-
-            for (String mask : parseJsonStringArrayByKey(json, "masks")) {
-                String trimmed = mask == null ? "" : mask.trim();
-                if (!trimmed.isEmpty() && !maskField.getItems().contains(trimmed)) {
-                    maskField.getItems().add(trimmed);
-                }
-                if (maskField.getItems().size() >= MASK_HISTORY_LIMIT) {
-                    break;
-                }
-            }
-
-            // Совместимость со старым форматом: {"masks":[...]}
-            if (maskField.getItems().isEmpty()) {
-                List<String> legacyMasks = parseMaskHistoryJson(json);
-                for (String mask : legacyMasks) {
-                    String trimmed = mask == null ? "" : mask.trim();
-                    if (!trimmed.isEmpty() && !maskField.getItems().contains(trimmed)) {
-                        maskField.getItems().add(trimmed);
-                    }
-                    if (maskField.getItems().size() >= MASK_HISTORY_LIMIT) {
-                        break;
-                    }
-                }
-            }
-        } catch (IOException ignored) {
-            // История полей не критична: при ошибке просто стартуем без неё.
-        }
-    }
-
     private void saveFieldHistories() {
-        try {
-            Files.createDirectories(MASK_HISTORY_FILE.getParent());
-            String json = toFieldHistoryJson(directoryField.getItems(), maskField.getItems());
-            Files.writeString(MASK_HISTORY_FILE, json, StandardCharsets.UTF_8);
-        } catch (IOException ignored) {
-            // История полей не критична для основной функциональности.
-        }
-    }
-
-    private static String toFieldHistoryJson(List<String> directories, List<String> masks) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("{\n  \"directories\": [");
-        for (int i = 0; i < directories.size(); i++) {
-            if (i > 0) {
-                sb.append(", ");
-            }
-            sb.append('"').append(escapeJson(directories.get(i))).append('"');
-        }
-        sb.append("],\n  \"masks\": [");
-        for (int i = 0; i < masks.size(); i++) {
-            if (i > 0) {
-                sb.append(", ");
-            }
-            sb.append('"').append(escapeJson(masks.get(i))).append('"');
-        }
-        sb.append("]\n}\n");
-        return sb.toString();
-    }
-
-    private static List<String> parseJsonStringArrayByKey(String json, String key) {
-        if (json == null || json.isBlank()) {
-            return List.of();
-        }
-        int keyPos = json.indexOf('"' + key + '"');
-        if (keyPos < 0) {
-            return List.of();
-        }
-        int arrayStart = json.indexOf('[', keyPos);
-        if (arrayStart < 0) {
-            return List.of();
-        }
-        int depth = 0;
-        int arrayEnd = -1;
-        for (int i = arrayStart; i < json.length(); i++) {
-            char ch = json.charAt(i);
-            if (ch == '[') {
-                depth++;
-            } else if (ch == ']') {
-                depth--;
-                if (depth == 0) {
-                    arrayEnd = i;
-                    break;
-                }
-            }
-        }
-        if (arrayEnd <= arrayStart) {
-            return List.of();
-        }
-        return parseMaskHistoryJson("{\"masks\": [" + json.substring(arrayStart + 1, arrayEnd) + "]}");
-    }
-
-    private static String toMaskHistoryJson(List<String> masks) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("{\n  \"masks\": [");
-        for (int i = 0; i < masks.size(); i++) {
-            if (i > 0) {
-                sb.append(", ");
-            }
-            sb.append('"').append(escapeJson(masks.get(i))).append('"');
-        }
-        sb.append("]\n}\n");
-        return sb.toString();
-    }
-
-    private static List<String> parseMaskHistoryJson(String json) {
-        if (json == null || json.isBlank()) {
-            return List.of();
-        }
-        int arrayStart = json.indexOf('[');
-        int arrayEnd = json.lastIndexOf(']');
-        if (arrayStart < 0 || arrayEnd <= arrayStart) {
-            return List.of();
-        }
-        String body = json.substring(arrayStart + 1, arrayEnd);
-
-        List<String> out = new ArrayList<>();
-        StringBuilder current = new StringBuilder();
-        boolean inString = false;
-        boolean escaping = false;
-
-        for (int i = 0; i < body.length(); i++) {
-            char ch = body.charAt(i);
-            if (!inString) {
-                if (ch == '"') {
-                    inString = true;
-                    current.setLength(0);
-                }
-                continue;
-            }
-
-            if (escaping) {
-                switch (ch) {
-                    case '"' -> current.append('"');
-                    case '\\' -> current.append('\\');
-                    case 'n' -> current.append('\n');
-                    case 'r' -> current.append('\r');
-                    case 't' -> current.append('\t');
-                    default -> current.append(ch);
-                }
-                escaping = false;
-                continue;
-            }
-
-            if (ch == '\\') {
-                escaping = true;
-                continue;
-            }
-            if (ch == '"') {
-                out.add(current.toString());
-                inString = false;
-                continue;
-            }
-            current.append(ch);
-        }
-        return out;
-    }
-
-    private static String escapeJson(String value) {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < value.length(); i++) {
-            char c = value.charAt(i);
-            switch (c) {
-                case '"' -> sb.append("\\\"");
-                case '\\' -> sb.append("\\\\");
-                case '\n' -> sb.append("\\n");
-                case '\r' -> sb.append("\\r");
-                case '\t' -> sb.append("\\t");
-                default -> sb.append(c);
-            }
-        }
-        return sb.toString();
+        historyStore.save(directoryField.getItems(), maskField.getItems());
     }
 
     private static List<String> parseMasks(String text) {
