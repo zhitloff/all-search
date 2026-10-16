@@ -24,13 +24,12 @@ import javafx.scene.input.MouseButton;
 import javafx.scene.input.ScrollEvent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.StackPane;
 import javafx.scene.text.Font;
 import javafx.scene.text.Text;
-import javafx.scene.text.TextFlow;
 import javafx.stage.DirectoryChooser;
 
 import org.fxmisc.richtext.CodeArea;
-import org.fxmisc.richtext.model.TwoDimensional;
 import org.fxmisc.richtext.model.StyleSpans;
 import org.fxmisc.richtext.model.StyleSpansBuilder;
 
@@ -103,7 +102,11 @@ public class MainController {
     @FXML
     private HBox contentRow;
     @FXML
-    private TextFlow lineNumberLabel;
+    private Label lineNumberLabel;
+    @FXML
+    private Label lineNumberHighlightLabel;
+    @FXML
+    private StackPane lineNumberPane;
     @FXML
     private Label statusLabel;
     @FXML
@@ -191,10 +194,12 @@ public class MainController {
     private boolean suppressFontHistoryEvents;
     private List<String> allFontFamilies = List.of();
     private boolean updatingFontFamilyItems;
-    private final List<int[]> currentHits = new ArrayList<>();
+    private final List<Hit> currentHits = new ArrayList<>();
     private int currentHitIndex = -1;
     /** Отложенный индекс совпадения, который нужно выставить после смены файла. */
     private Integer pendingHitIndex;
+
+    private record Hit(int start, int end) {}
 
     /** RichTextFX-область для показа содержимого файла (создаётся в {@link #initialize()}). */
     private CodeArea contentArea;
@@ -202,7 +207,6 @@ public class MainController {
     private double rowContentWidth;
     /** Количество строк в тексте, который сейчас показан справа. */
     private int currentLineCount = 1;
-    private int lineNumberColumnWidthChars = 1;
 
     @FXML
     private void initialize() {
@@ -278,7 +282,8 @@ public class MainController {
     /** Показывает содержимое выбранного слева файла в правой панели, подсвечивая найденный текст. */
     private void showFileContent(Path file) {
         if (file == null) {
-            lineNumberLabel.getChildren().clear();
+            lineNumberLabel.setText("");
+            lineNumberHighlightLabel.setText("");
             contentArea.replaceText(0, contentArea.getLength(), "");
             currentHits.clear();
             currentHitIndex = -1;
@@ -296,8 +301,8 @@ public class MainController {
             }
             int lineCount = countLines(text);
             currentLineCount = Math.max(1, lineCount);
-            lineNumberColumnWidthChars = String.valueOf(currentLineCount).length();
-            rebuildLineNumbers(lineCount, -1);
+            rebuildLineNumbers(lineCount);
+            lineNumberHighlightLabel.setText("");
             // Номера и текст должны иметь одинаковую высоту строк, иначе они разъедутся.
             // Высоту текстовой области задаём равной высоте колонки номеров плюс запас
             // на несколько строк, чтобы последняя строка файла не обрезалась.
@@ -325,7 +330,8 @@ public class MainController {
             rowContentWidth = lineNumberLabel.prefWidth(-1) + widestLineWidth(text, Font.font(currentFontFamily(), currentFontSize()));
             updateRowWidth();
         } catch (IOException e) {
-            lineNumberLabel.getChildren().clear();
+            lineNumberLabel.setText("");
+            lineNumberHighlightLabel.setText("");
             contentArea.replaceText(0, contentArea.getLength(), "");
             currentLineCount = 1;
             currentHits.clear();
@@ -347,7 +353,7 @@ public class MainController {
                 int start = matcher.start();
                 int end = matcher.end();
                 if (end > start) {
-                    currentHits.add(new int[]{start, end});
+                    currentHits.add(new Hit(start, end));
                 }
             }
         }
@@ -357,20 +363,20 @@ public class MainController {
     private void focusHit(int index) {
         if (currentHits.isEmpty()) {
             currentHitIndex = -1;
-            rebuildLineNumbers(currentLineCount, -1);
+            lineNumberHighlightLabel.setText("");
             updateFileMatchesLabel();
             updateHitButtons();
             return;
         }
         int safeIndex = Math.max(0, Math.min(currentHits.size() - 1, index));
         currentHitIndex = safeIndex;
-        int[] hit = currentHits.get(safeIndex);
-        int line = contentArea.offsetToPosition(hit[0], TwoDimensional.Bias.Forward).getMajor() + 1;
-        rebuildLineNumbers(currentLineCount, line);
-        updateFileMatchesLabel();
+        Hit hit = currentHits.get(safeIndex);
         contentArea.requestFocus();
-        contentArea.selectRange(hit[0], hit[1]);
-        int paragraph = contentArea.offsetToPosition(hit[0], TwoDimensional.Bias.Forward).getMajor();
+        contentArea.selectRange(hit.start(), hit.end());
+        int line = lineFromOffsetInContent(hit.start());
+        int paragraph = line - 1;
+        highlightLineNumber(line);
+        updateFileMatchesLabel();
         scrollToParagraph(paragraph);
         updateHitButtons();
     }
@@ -579,14 +585,7 @@ public class MainController {
 
         contentArea.setStyle("-fx-font-family: '" + escaped + "'; -fx-font-size: " + px + "px;");
         lineNumberLabel.setStyle("-fx-font-family: '" + escaped + "'; -fx-font-size: " + px + "px;");
-        if (currentLineCount > 0) {
-            int activeLine = -1;
-            if (!currentHits.isEmpty() && currentHitIndex >= 0 && currentHitIndex < currentHits.size()) {
-                int[] hit = currentHits.get(currentHitIndex);
-                activeLine = contentArea.offsetToPosition(hit[0], TwoDimensional.Bias.Forward).getMajor() + 1;
-            }
-            rebuildLineNumbers(currentLineCount, activeLine);
-        }
+        lineNumberHighlightLabel.setStyle("-fx-font-family: '" + escaped + "'; -fx-font-size: " + px + "px;");
 
         Path selected = fileTable.getSelectionModel().getSelectedItem();
         if (selected != null) {
@@ -618,22 +617,36 @@ public class MainController {
         return sb.toString();
     }
 
-    private void rebuildLineNumbers(int count, int highlightedLine1Based) {
-        lineNumberLabel.getChildren().clear();
-        String format = "%" + Math.max(1, lineNumberColumnWidthChars) + "d";
-        for (int i = 1; i <= count; i++) {
-            String line = String.format(Locale.ROOT, format, i);
-            if (i < count) {
-                line += "\n";
-            }
-            Text t = new Text(line);
-            if (i == highlightedLine1Based) {
-                t.setStyle("-fx-fill: #c00000; -fx-font-weight: bold;");
-            } else {
-                t.setStyle("-fx-fill: #888888;");
-            }
-            lineNumberLabel.getChildren().add(t);
+    private void rebuildLineNumbers(int count) {
+        int widthChars = String.valueOf(Math.max(1, count)).length();
+        lineNumberLabel.setText(buildLineNumbers(count, widthChars));
+        lineNumberHighlightLabel.setText("");
+    }
+
+    private void highlightLineNumber(int line1Based) {
+        if (line1Based <= 0 || line1Based > currentLineCount) {
+            lineNumberHighlightLabel.setText("");
+            return;
         }
+        int widthChars = String.valueOf(Math.max(1, currentLineCount)).length();
+        lineNumberHighlightLabel.setText(buildSingleLineNumbers(currentLineCount, line1Based, widthChars));
+    }
+
+    private static String buildSingleLineNumbers(int count, int highlightedLine1Based, int widthChars) {
+        String format = "%" + Math.max(1, widthChars) + "d";
+        String blank = " ".repeat(Math.max(1, widthChars));
+        StringBuilder sb = new StringBuilder(count * (Math.max(1, widthChars) + 1));
+        for (int i = 1; i <= count; i++) {
+            if (i > 1) {
+                sb.append('\n');
+            }
+            if (i == highlightedLine1Based) {
+                sb.append(String.format(Locale.ROOT, format, i));
+            } else {
+                sb.append(blank);
+            }
+        }
+        return sb.toString();
     }
 
     /**
@@ -1307,7 +1320,8 @@ public class MainController {
         lastRegex = options.regex();
         lastCaseSensitive = options.caseSensitive();
         files.clear();
-        lineNumberLabel.getChildren().clear();
+        lineNumberLabel.setText("");
+        lineNumberHighlightLabel.setText("");
         contentArea.replaceText(0, contentArea.getLength(), "");
         currentHits.clear();
         currentHitIndex = -1;
@@ -1366,6 +1380,18 @@ public class MainController {
         }
         int current = currentHitIndex >= 0 ? currentHitIndex + 1 : 1;
         fileMatchesLabel.setText("Совпадений в файле: " + total + " (текущее: " + current + ")");
+    }
+
+    private int lineFromOffsetInContent(int offset) {
+        String text = contentArea.getText();
+        int safeOffset = Math.max(0, Math.min(offset, text.length()));
+        int line = 1;
+        for (int i = 0; i < safeOffset; i++) {
+            if (text.charAt(i) == '\n') {
+                line++;
+            }
+        }
+        return line;
     }
 
     @FXML

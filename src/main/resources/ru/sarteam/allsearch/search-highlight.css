@@ -41,18 +41,24 @@
 #lineNumberLabel {
     -fx-font-family: monospace;
     -fx-font-size: 12px;
+    -fx-text-fill: #888888;
     -fx-padding: 0 8 0 8;
+    -fx-translate-y: 0;
     -fx-border-color: transparent #d0d0d0 transparent transparent;
     -fx-border-width: 0 1 0 0;
 }
 
-#lineNumberLabel .text.line-number {
-    -fx-fill: #888888;
+#lineNumberHighlightLabel {
+    -fx-font-family: monospace;
+    -fx-font-size: 12px;
+    -fx-text-fill: #c00000;
+    -fx-font-weight: bold;
+    -fx-padding: 0 8 0 8;
+    -fx-translate-y: 0;
 }
 
-#lineNumberLabel .text.line-number-hit {
-    -fx-fill: #c00000;
-    -fx-font-weight: bold;
+#lineNumberPane {
+    -fx-alignment: top-right;
 }
 
 /* Цвет выделения текста в CodeArea (мышь/клавиатура). */
