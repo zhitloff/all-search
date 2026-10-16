@@ -11,8 +11,8 @@
     -fx-padding: 0;
 }
 .content-area .paragraph-text {
-    -fx-font-family: inherit;
-    -fx-font-size: inherit;
+    -fx-font-family: monospace;
+    -fx-font-size: 12px;
 }
 
 /* Скроллпанель с текстом и номерами поверх белого фона панели. */

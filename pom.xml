@@ -75,6 +75,7 @@
                         <id>default-cli</id>
                         <configuration>
                             <mainClass>ru.sarteam.allsearch/ru.sarteam.allsearch.MainApplication</mainClass>
+                            <jvmArgs>--enable-native-access=javafx.graphics</jvmArgs>
                             <launcher>app</launcher>
                             <jlinkZipName>app</jlinkZipName>
                             <jlinkImageName>app</jlinkImageName>
