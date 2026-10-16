@@ -72,12 +72,22 @@ public final class SearchEngine {
      * @param onFile колбэк прогресса (полный путь текущего файла), может быть {@code null}
      */
     public List<Result> search(Path root, Options options, Consumer<String> onFile) {
+        return search(root, options, onFile, null);
+    }
+
+    /**
+     * Ищет совпадения в файлах под {@code root} (рекурсивно).
+     *
+     * @param onFile колбэк прогресса (полный путь текущего файла), может быть {@code null}
+     * @param onMatchedFile колбэк при первом совпадении в файле, может быть {@code null}
+     */
+    public List<Result> search(Path root, Options options, Consumer<String> onFile, Consumer<Path> onMatchedFile) {
         cancelled.set(false);
         List<Result> results = new ArrayList<>();
         Pattern pattern = options.regex() ? compileRegex(options.query(), options.caseSensitive()) : null;
         String needle = options.caseSensitive() ? options.query() : options.query().toLowerCase(Locale.ROOT);
         List<PathMatcher> matchers = compileMasks(options.masks());
-        walk(root, options, pattern, needle, matchers, results, onFile);
+        walk(root, options, pattern, needle, matchers, results, onFile, onMatchedFile);
         return results;
     }
 
@@ -91,7 +101,7 @@ public final class SearchEngine {
     }
 
     private void walk(Path dir, Options options, Pattern pattern, String needle, List<PathMatcher> matchers,
-                      List<Result> results, Consumer<String> onFile) {
+                      List<Result> results, Consumer<String> onFile, Consumer<Path> onMatchedFile) {
         if (cancelled.get()) {
             return;
         }
@@ -119,15 +129,15 @@ public final class SearchEngine {
             if (cancelled.get()) {
                 return;
             }
-            searchFile(file, options, pattern, needle, matchers, results, onFile);
+            searchFile(file, options, pattern, needle, matchers, results, onFile, onMatchedFile);
         }
         for (Path sub : dirs) {
-            walk(sub, options, pattern, needle, matchers, results, onFile);
+            walk(sub, options, pattern, needle, matchers, results, onFile, onMatchedFile);
         }
     }
 
     private void searchFile(Path file, Options options, Pattern pattern, String needle, List<PathMatcher> matchers,
-                            List<Result> results, Consumer<String> onFile) {
+                            List<Result> results, Consumer<String> onFile, Consumer<Path> onMatchedFile) {
         if (!matchesMask(file, matchers)) {
             return;
         }
@@ -148,11 +158,16 @@ public final class SearchEngine {
         }
         String content = decode(bytes);
         int lineNo = 0;
+        boolean matchedFileNotified = false;
         try (BufferedReader reader = new BufferedReader(new StringReader(content))) {
             String line;
             while ((line = reader.readLine()) != null) {
                 lineNo++;
                 if (matches(line, pattern, needle, options)) {
+                    if (!matchedFileNotified && onMatchedFile != null) {
+                        onMatchedFile.accept(file);
+                        matchedFileNotified = true;
+                    }
                     results.add(new Result(file, lineNo, line));
                     if (results.size() >= options.maxResults()) {
                         return;

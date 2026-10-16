@@ -45,8 +45,10 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
@@ -1270,20 +1272,21 @@ public class MainController {
         setRunning(true);
 
         engine = new SearchEngine();
+        Set<Path> shownFiles = Collections.synchronizedSet(new HashSet<>());
         Task<List<SearchEngine.Result>> task = new Task<>() {
             @Override
             protected List<SearchEngine.Result> call() {
-                return engine.search(root, options, this::updateMessage);
+                return engine.search(root, options, this::updateMessage, file -> {
+                    if (shownFiles.add(file)) {
+                        javafx.application.Platform.runLater(() -> files.add(file));
+                    }
+                });
             }
         };
         task.setOnSucceeded(event -> {
             allResults.addAll(task.getValue());
-            List<Path> distinctFiles = allResults.stream()
-                    .map(SearchEngine.Result::file)
-                    .distinct()
-                    .toList();
-            files.setAll(distinctFiles);
-            if (!distinctFiles.isEmpty()) {
+            files.sort(Comparator.comparing(Path::toString, String.CASE_INSENSITIVE_ORDER));
+            if (!files.isEmpty()) {
                 fileTable.getSelectionModel().select(0); // заполнит правую панель содержимым
             }
             finish(interrupted
