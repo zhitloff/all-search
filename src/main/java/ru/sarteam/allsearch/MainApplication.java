@@ -17,6 +17,7 @@ public class MainApplication extends Application {
         FXMLLoader fxmlLoader = new FXMLLoader(MainApplication.class.getResource("main-view.fxml"));
         Scene scene = new Scene(fxmlLoader.load(), 960, 620);
         scene.getStylesheets().add(MainApplication.class.getResource("search-highlight.css").toExternalForm());
+        scene.getStylesheets().add(MainApplication.class.getResource("theme-light.css").toExternalForm());
         stage.setTitle("all-search — поиск по тексту в файлах");
         stage.setMinWidth(640);
         stage.setMinHeight(400);

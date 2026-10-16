@@ -1,0 +1,86 @@
+/* Светлая тема */
+.root {
+    -fx-base: #f5f7fb;
+    -fx-background: #f5f7fb;
+    -fx-control-inner-background: #ffffff;
+    -fx-accent: #4f8cff;
+    -fx-focus-color: #6ca0ff;
+    -fx-faint-focus-color: rgba(79, 140, 255, 0.15);
+    -fx-text-background-color: #1f2430;
+}
+
+#rootPane {
+    -fx-background-color: linear-gradient(to bottom, #f7f9fc, #eef2f9);
+}
+
+.label {
+    -fx-text-fill: #1f2430;
+}
+
+.text-field,
+.combo-box,
+.spinner,
+.table-view,
+.scroll-pane,
+.code-area {
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+}
+
+.text-field,
+.combo-box,
+.spinner {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #d6deea;
+    -fx-text-fill: #1f2430;
+}
+
+.button {
+    -fx-background-color: linear-gradient(to bottom, #ffffff, #edf2fb);
+    -fx-border-color: #d6deea;
+    -fx-text-fill: #1f2430;
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+}
+
+.button:default {
+    -fx-background-color: linear-gradient(to bottom, #5a95ff, #3f7ff2);
+    -fx-border-color: #3a73db;
+    -fx-text-fill: white;
+}
+
+.table-view {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #d6deea;
+}
+
+.table-row-cell {
+    -fx-background-color: #ffffff;
+}
+
+.table-row-cell:filled:selected {
+    -fx-background-color: #dce9ff;
+}
+
+#textScrollPane {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #d6deea;
+}
+
+.code-area {
+    -fx-background-color: #ffffff;
+    -fx-fill: #1f2430;
+}
+
+#lineNumberLabel {
+    -fx-text-fill: #7b8798;
+    -fx-border-color: transparent #d6deea transparent transparent;
+}
+
+.progress-bar > .track {
+    -fx-background-color: #dbe5f6;
+}
+
+.progress-bar > .bar {
+    -fx-background-color: linear-gradient(to right, #5a95ff, #3f7ff2);
+}
