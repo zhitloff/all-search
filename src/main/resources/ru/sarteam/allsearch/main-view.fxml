@@ -50,7 +50,7 @@
         </VBox>
     </top>
     <center>
-        <SplitPane dividerPositions="0.35">
+        <SplitPane dividerPositions="0.25">
             <TableView fx:id="fileTable">
                 <columns>
                     <TableColumn fx:id="fileNameColumn" text="Файл" prefWidth="220.0"/>
