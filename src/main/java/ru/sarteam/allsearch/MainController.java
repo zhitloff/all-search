@@ -29,6 +29,7 @@ import javafx.scene.text.Text;
 import javafx.stage.DirectoryChooser;
 
 import org.fxmisc.richtext.CodeArea;
+import org.fxmisc.richtext.model.TwoDimensional;
 import org.fxmisc.richtext.model.StyleSpans;
 import org.fxmisc.richtext.model.StyleSpansBuilder;
 
@@ -78,6 +79,10 @@ public class MainController {
     @FXML
     private Button searchButton;
     @FXML
+    private Button prevHitButton;
+    @FXML
+    private Button nextHitButton;
+    @FXML
     private Button browseButton;
     @FXML
     private Button cancelButton;
@@ -108,11 +113,15 @@ public class MainController {
     private String lastQuery;
     private boolean lastRegex;
     private boolean lastCaseSensitive;
+    private final List<int[]> currentHits = new ArrayList<>();
+    private int currentHitIndex = -1;
 
     /** RichTextFX-область для показа содержимого файла (создаётся в {@link #initialize()}). */
     private CodeArea contentArea;
     /** Ширина контента правой панели: номера + самая длинная строка текста (px). */
     private double rowContentWidth;
+    /** Количество строк в тексте, который сейчас показан справа. */
+    private int currentLineCount = 1;
 
     @FXML
     private void initialize() {
@@ -180,6 +189,9 @@ public class MainController {
         if (file == null) {
             lineNumberLabel.setText("");
             contentArea.replaceText(0, contentArea.getLength(), "");
+            currentHits.clear();
+            currentHitIndex = -1;
+            updateHitButtons();
             return;
         }
         try {
@@ -190,6 +202,7 @@ public class MainController {
                         + "\n\n… (файл обрезан для отображения: всего символов " + fullLength + ")";
             }
             int lineCount = countLines(text);
+            currentLineCount = Math.max(1, lineCount);
             lineNumberLabel.setText(buildLineNumbers(lineCount));
             // Номера и текст должны иметь одинаковую высоту строк, иначе они разъедутся.
             // Высоту текстовой области задаём равной высоте колонки номеров плюс запас
@@ -201,6 +214,8 @@ public class MainController {
             contentArea.setMinHeight(areaHeight);
             contentArea.replaceText(0, contentArea.getLength(), text);
             contentArea.setStyleSpans(0, buildHighlightSpans(text));
+            rebuildHits(text);
+            focusHit(0);
             contentArea.requestLayout();
             // Ширина ряда: не уже панели, но достаточно, чтобы поместилась самая длинная строка.
             rowContentWidth = lineNumberLabel.prefWidth(-1) + widestLineWidth(text, Font.font(currentFontFamily(), currentFontSize()));
@@ -208,8 +223,93 @@ public class MainController {
         } catch (IOException e) {
             lineNumberLabel.setText("");
             contentArea.replaceText(0, contentArea.getLength(), "");
+            currentLineCount = 1;
+            currentHits.clear();
+            currentHitIndex = -1;
+            updateHitButtons();
             statusLabel.setText("Не удалось прочитать файл: " + e.getMessage());
         }
+    }
+
+    private void rebuildHits(String text) {
+        currentHits.clear();
+        currentHitIndex = -1;
+        Pattern pattern = compileHighlightPattern();
+        if (pattern != null) {
+            Matcher matcher = pattern.matcher(text);
+            while (matcher.find()) {
+                int start = matcher.start();
+                int end = matcher.end();
+                if (end > start) {
+                    currentHits.add(new int[]{start, end});
+                }
+            }
+        }
+        updateHitButtons();
+    }
+
+    private void focusHit(int index) {
+        if (currentHits.isEmpty()) {
+            currentHitIndex = -1;
+            updateHitButtons();
+            return;
+        }
+        int safeIndex = Math.max(0, Math.min(currentHits.size() - 1, index));
+        currentHitIndex = safeIndex;
+        int[] hit = currentHits.get(safeIndex);
+        contentArea.requestFocus();
+        contentArea.selectRange(hit[0], hit[1]);
+        int paragraph = contentArea.offsetToPosition(hit[0], TwoDimensional.Bias.Forward).getMajor();
+        scrollToParagraph(paragraph);
+        updateHitButtons();
+    }
+
+    /**
+     * Стабильно прокручивает внешний ScrollPane к нужному параграфу (строке)
+     * без многократных runLater-попыток и «дёрганья».
+     */
+    private void scrollToParagraph(int paragraphIndex) {
+        if (textScrollPane.getContent() == null) {
+            return;
+        }
+        double contentH = textScrollPane.getContent().getBoundsInLocal().getHeight();
+        double viewportH = textScrollPane.getViewportBounds().getHeight();
+        if (contentH <= viewportH || viewportH <= 0) {
+            return;
+        }
+
+        int lines = Math.max(1, currentLineCount);
+        int clampedParagraph = Math.max(0, Math.min(lines - 1, paragraphIndex));
+
+        double lineHeight = Math.max(1.0, contentH / lines);
+        double paragraphCenterY = (clampedParagraph + 0.5) * lineHeight;
+        double targetTop = paragraphCenterY - viewportH / 2.0;
+
+        double range = contentH - viewportH;
+        targetTop = Math.max(0.0, Math.min(range, targetTop));
+        textScrollPane.setVvalue(targetTop / range);
+    }
+
+    private void gotoNextHit() {
+        if (currentHits.isEmpty()) {
+            return;
+        }
+        int next = currentHitIndex < 0 ? 0 : (currentHitIndex + 1) % currentHits.size();
+        focusHit(next);
+    }
+
+    private void gotoPrevHit() {
+        if (currentHits.isEmpty()) {
+            return;
+        }
+        int prev = currentHitIndex < 0 ? currentHits.size() - 1 : (currentHitIndex - 1 + currentHits.size()) % currentHits.size();
+        focusHit(prev);
+    }
+
+    private void updateHitButtons() {
+        boolean hasHits = !currentHits.isEmpty();
+        prevHitButton.setDisable(!hasHits || searchButton.isDisable());
+        nextHitButton.setDisable(!hasHits || searchButton.isDisable());
     }
 
     /**
@@ -534,6 +634,16 @@ public class MainController {
         }
     }
 
+    @FXML
+    private void onPrevHit() {
+        gotoPrevHit();
+    }
+
+    @FXML
+    private void onNextHit() {
+        gotoNextHit();
+    }
+
     private void setRunning(boolean running) {
         searchButton.setDisable(running);
         browseButton.setDisable(running);
@@ -546,6 +656,7 @@ public class MainController {
         regexCheck.setDisable(running);
         caseCheck.setDisable(running);
         textOnlyCheck.setDisable(running);
+        updateHitButtons();
     }
 
     private void openFile(Path file) {

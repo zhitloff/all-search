@@ -32,6 +32,8 @@
                 <Label text="Текст:"/>
                 <TextField fx:id="queryField" HBox.hgrow="ALWAYS" promptText="Что искать…"/>
                 <Button fx:id="searchButton" text="Искать" defaultButton="true" onAction="#onSearch"/>
+                <Button fx:id="prevHitButton" text="↑" onAction="#onPrevHit" disable="true"/>
+                <Button fx:id="nextHitButton" text="↓" onAction="#onNextHit" disable="true"/>
                 <Button fx:id="cancelButton" text="Отмена" onAction="#onCancel" disable="true"/>
             </HBox>
             <HBox spacing="12.0" alignment="CENTER_LEFT">
