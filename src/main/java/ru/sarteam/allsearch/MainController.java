@@ -12,11 +12,14 @@ import javafx.scene.control.Label;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.ProgressBar;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.control.Spinner;
+import javafx.scene.control.SpinnerValueFactory;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableRow;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.scene.control.Tooltip;
+import javafx.scene.control.ComboBox;
 import javafx.scene.input.MouseButton;
 import javafx.scene.input.ScrollEvent;
 import javafx.scene.layout.HBox;
@@ -37,6 +40,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.Collections;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -68,6 +72,10 @@ public class MainController {
     @FXML
     private TextField maskField;
     @FXML
+    private ComboBox<String> fontFamilyCombo;
+    @FXML
+    private Spinner<Integer> fontSizeSpinner;
+    @FXML
     private Button searchButton;
     @FXML
     private Button browseButton;
@@ -90,6 +98,8 @@ public class MainController {
 
     private static final int MAX_DISPLAY_CHARS = 2_000_000;
     private static final int MAX_HIGHLIGHTS = 5_000;
+    private static final String DEFAULT_FONT_FAMILY = "JetBrains Mono";
+    private static final int DEFAULT_FONT_SIZE = 14;
 
     private final ObservableList<Path> files = FXCollections.observableArrayList();
     private final List<SearchEngine.Result> allResults = new ArrayList<>();
@@ -114,7 +124,7 @@ public class MainController {
         contentArea.setEditable(false);
         contentArea.setFocusTraversable(true);
         contentArea.getStyleClass().add("content-area");
-        contentArea.setStyle("-fx-font-family: monospace; -fx-font-size: 12px;");
+        contentArea.setStyle("-fx-font-family: '" + DEFAULT_FONT_FAMILY + "'; -fx-font-size: " + DEFAULT_FONT_SIZE + "px;");
 
         // Номера строк и текст лежат в одном ScrollPane и прокручиваются вместе,
         // поэтому никакой синхронизации прокрутки не нужно.
@@ -126,6 +136,9 @@ public class MainController {
         // Принудительно прокручиваем внешний ScrollPane, чтобы скролл работал
         // одинаково над номерами строк и над текстом.
         contentRow.addEventFilter(ScrollEvent.SCROLL, this::forwardScrollToPane);
+
+        initFontControls();
+        applyContentFont(currentFontFamily(), currentFontSize());
 
         // Выделение и копирование текста в CodeArea.
         ContextMenu copyMenu = new ContextMenu();
@@ -189,7 +202,7 @@ public class MainController {
             contentArea.setStyleSpans(0, buildHighlightSpans(text));
             contentArea.requestLayout();
             // Ширина ряда: не уже панели, но достаточно, чтобы поместилась самая длинная строка.
-            rowContentWidth = lineNumberLabel.prefWidth(-1) + widestLineWidth(text, Font.font("monospace", 12));
+            rowContentWidth = lineNumberLabel.prefWidth(-1) + widestLineWidth(text, Font.font(currentFontFamily(), currentFontSize()));
             updateRowWidth();
         } catch (IOException e) {
             lineNumberLabel.setText("");
@@ -204,6 +217,58 @@ public class MainController {
      */
     private static String normalizeLineEndings(String text) {
         return text.replace("\r\n", "\n").replace('\r', '\n');
+    }
+
+    private void initFontControls() {
+        List<String> families = Font.getFamilies().stream()
+                .sorted(Comparator.naturalOrder())
+                .toList();
+        fontFamilyCombo.getItems().setAll(families);
+
+        if (families.contains(DEFAULT_FONT_FAMILY)) {
+            fontFamilyCombo.getSelectionModel().select(DEFAULT_FONT_FAMILY);
+        } else if (!families.isEmpty()) {
+            fontFamilyCombo.getSelectionModel().selectFirst();
+        }
+
+        SpinnerValueFactory.IntegerSpinnerValueFactory valueFactory =
+                new SpinnerValueFactory.IntegerSpinnerValueFactory(8, 72, DEFAULT_FONT_SIZE, 1);
+        fontSizeSpinner.setValueFactory(valueFactory);
+
+        fontFamilyCombo.valueProperty().addListener((obs, oldV, newV) -> {
+            if (newV != null && !newV.isBlank()) {
+                applyContentFont(newV, currentFontSize());
+            }
+        });
+        fontSizeSpinner.valueProperty().addListener((obs, oldV, newV) -> {
+            if (newV != null) {
+                applyContentFont(currentFontFamily(), newV);
+            }
+        });
+    }
+
+    private String currentFontFamily() {
+        String family = fontFamilyCombo == null ? null : fontFamilyCombo.getValue();
+        return (family == null || family.isBlank()) ? DEFAULT_FONT_FAMILY : family;
+    }
+
+    private int currentFontSize() {
+        Integer size = fontSizeSpinner == null ? null : fontSizeSpinner.getValue();
+        return size == null ? DEFAULT_FONT_SIZE : Math.max(8, Math.min(72, size));
+    }
+
+    private void applyContentFont(String family, int size) {
+        String safeFamily = (family == null || family.isBlank()) ? DEFAULT_FONT_FAMILY : family;
+        int px = Math.max(8, Math.min(72, size));
+        String escaped = safeFamily.replace("'", "\\'");
+
+        contentArea.setStyle("-fx-font-family: '" + escaped + "'; -fx-font-size: " + px + "px;");
+        lineNumberLabel.setStyle("-fx-font-family: '" + escaped + "'; -fx-font-size: " + px + "px;");
+
+        Path selected = fileTable.getSelectionModel().getSelectedItem();
+        if (selected != null) {
+            showFileContent(selected);
+        }
     }
 
     /** Число строк в тексте (считает символы '\n'). */
@@ -475,6 +540,8 @@ public class MainController {
         directoryField.setDisable(running);
         queryField.setDisable(running);
         maskField.setDisable(running);
+        fontFamilyCombo.setDisable(running);
+        fontSizeSpinner.setDisable(running);
         regexCheck.setDisable(running);
         caseCheck.setDisable(running);
         textOnlyCheck.setDisable(running);

@@ -3,9 +3,11 @@
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.CheckBox?>
+<?import javafx.scene.control.ComboBox?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.ProgressBar?>
 <?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.Spinner?>
 <?import javafx.scene.control.SplitPane?>
 <?import javafx.scene.control.TableColumn?>
 <?import javafx.scene.control.TableView?>
@@ -38,6 +40,9 @@
                 <CheckBox fx:id="textOnlyCheck" text="Только текстовые" selected="true"/>
                 <Label text="Маска:"/>
                 <TextField fx:id="maskField" prefWidth="240.0" promptText="*.txt;*.md;*.java;*.xml (пусто — все файлы)"/>
+                <Label text="Шрифт:"/>
+                <ComboBox fx:id="fontFamilyCombo" prefWidth="180.0"/>
+                <Spinner fx:id="fontSizeSpinner" prefWidth="90.0" editable="true"/>
             </HBox>
         </VBox>
     </top>
