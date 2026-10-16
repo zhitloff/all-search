@@ -41,7 +41,7 @@
                 <CheckBox fx:id="caseCheck" text="Учитывать регистр"/>
                 <CheckBox fx:id="textOnlyCheck" text="Только текстовые" selected="true"/>
                 <Label text="Маска:"/>
-                <TextField fx:id="maskField" prefWidth="240.0" promptText="*.txt;*.md;*.java;*.xml (пусто — все файлы)"/>
+                <ComboBox fx:id="maskField" prefWidth="240.0" editable="true" promptText="*.txt;*.md;*.java;*.xml (пусто — все файлы)"/>
                 <Label text="Шрифт:"/>
                 <ComboBox fx:id="fontFamilyCombo" prefWidth="180.0"/>
                 <Spinner fx:id="fontSizeSpinner" prefWidth="90.0" editable="true"/>

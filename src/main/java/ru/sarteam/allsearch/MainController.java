@@ -8,6 +8,7 @@ import javafx.fxml.FXML;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ContextMenu;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.ProgressBar;
@@ -19,7 +20,6 @@ import javafx.scene.control.TableRow;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.scene.control.Tooltip;
-import javafx.scene.control.ComboBox;
 import javafx.scene.input.MouseButton;
 import javafx.scene.input.ScrollEvent;
 import javafx.scene.layout.HBox;
@@ -36,6 +36,7 @@ import org.fxmisc.richtext.model.StyleSpansBuilder;
 import java.awt.Desktop;
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -71,7 +72,7 @@ public class MainController {
     @FXML
     private CheckBox textOnlyCheck;
     @FXML
-    private TextField maskField;
+    private ComboBox<String> maskField;
     @FXML
     private ComboBox<String> fontFamilyCombo;
     @FXML
@@ -103,6 +104,9 @@ public class MainController {
 
     private static final int MAX_DISPLAY_CHARS = 2_000_000;
     private static final int MAX_HIGHLIGHTS = 5_000;
+    private static final int MASK_HISTORY_LIMIT = 20;
+    private static final Path MASK_HISTORY_FILE = Path.of(
+            System.getProperty("user.home"), ".all-search", "mask-history.json");
     private static final String DEFAULT_FONT_FAMILY = "Tahoma";
     private static final int DEFAULT_FONT_SIZE = 14;
 
@@ -115,6 +119,8 @@ public class MainController {
     private boolean lastCaseSensitive;
     private final List<int[]> currentHits = new ArrayList<>();
     private int currentHitIndex = -1;
+    /** Отложенный индекс совпадения, который нужно выставить после смены файла. */
+    private Integer pendingHitIndex;
 
     /** RichTextFX-область для показа содержимого файла (создаётся в {@link #initialize()}). */
     private CodeArea contentArea;
@@ -146,6 +152,8 @@ public class MainController {
         // одинаково над номерами строк и над текстом.
         contentRow.addEventFilter(ScrollEvent.SCROLL, this::forwardScrollToPane);
 
+        maskField.setEditable(true);
+        loadMaskHistory();
         initFontControls();
         applyContentFont(currentFontFamily(), currentFontSize());
 
@@ -191,6 +199,7 @@ public class MainController {
             contentArea.replaceText(0, contentArea.getLength(), "");
             currentHits.clear();
             currentHitIndex = -1;
+            pendingHitIndex = null;
             updateHitButtons();
             return;
         }
@@ -215,7 +224,16 @@ public class MainController {
             contentArea.replaceText(0, contentArea.getLength(), text);
             contentArea.setStyleSpans(0, buildHighlightSpans(text));
             rebuildHits(text);
-            focusHit(0);
+            int initialHit;
+            if (pendingHitIndex == null) {
+                initialHit = 0;
+            } else if (pendingHitIndex == Integer.MAX_VALUE) {
+                initialHit = currentHits.isEmpty() ? 0 : currentHits.size() - 1;
+            } else {
+                initialHit = pendingHitIndex;
+            }
+            pendingHitIndex = null;
+            focusHit(initialHit);
             contentArea.requestLayout();
             // Ширина ряда: не уже панели, но достаточно, чтобы поместилась самая длинная строка.
             rowContentWidth = lineNumberLabel.prefWidth(-1) + widestLineWidth(text, Font.font(currentFontFamily(), currentFontSize()));
@@ -226,6 +244,7 @@ public class MainController {
             currentLineCount = 1;
             currentHits.clear();
             currentHitIndex = -1;
+            pendingHitIndex = null;
             updateHitButtons();
             statusLabel.setText("Не удалось прочитать файл: " + e.getMessage());
         }
@@ -294,16 +313,55 @@ public class MainController {
         if (currentHits.isEmpty()) {
             return;
         }
-        int next = currentHitIndex < 0 ? 0 : (currentHitIndex + 1) % currentHits.size();
-        focusHit(next);
+        if (currentHitIndex >= 0 && currentHitIndex < currentHits.size() - 1) {
+            focusHit(currentHitIndex + 1);
+            return;
+        }
+        // Дошли до конца текущего файла: переходим к первому совпадению следующего файла.
+        if (!moveToAdjacentFile(+1)) {
+            focusHit(0);
+        }
     }
 
     private void gotoPrevHit() {
         if (currentHits.isEmpty()) {
             return;
         }
-        int prev = currentHitIndex < 0 ? currentHits.size() - 1 : (currentHitIndex - 1 + currentHits.size()) % currentHits.size();
-        focusHit(prev);
+        if (currentHitIndex > 0) {
+            focusHit(currentHitIndex - 1);
+            return;
+        }
+        // Дошли до начала текущего файла: переходим к последнему совпадению предыдущего файла.
+        if (!moveToAdjacentFile(-1)) {
+            focusHit(currentHits.size() - 1);
+        }
+    }
+
+    /**
+     * Сменить файл относительно текущего: direction=+1 (вперёд), -1 (назад).
+     * Возвращает true, если смена файла действительно произошла.
+     */
+    private boolean moveToAdjacentFile(int direction) {
+        int total = files.size();
+        if (total <= 1) {
+            return false;
+        }
+        Path currentFile = fileTable.getSelectionModel().getSelectedItem();
+        int currentIndex = files.indexOf(currentFile);
+        if (currentIndex < 0) {
+            currentIndex = 0;
+        }
+
+        int nextIndex = (currentIndex + direction + total) % total;
+        if (nextIndex == currentIndex) {
+            return false;
+        }
+
+        // После смены файла ставим курсор на нужный край списка совпадений.
+        pendingHitIndex = direction > 0 ? 0 : Integer.MAX_VALUE;
+        fileTable.getSelectionModel().select(nextIndex);
+        fileTable.scrollTo(nextIndex);
+        return true;
     }
 
     private void updateHitButtons() {
@@ -554,10 +612,145 @@ public class MainController {
                 query,
                 regexCheck.isSelected(),
                 caseCheck.isSelected(),
-                parseMasks(maskField.getText()),
+                parseMasks(currentMaskText()),
                 textOnlyCheck.isSelected(),
                 0);
+        rememberMask(currentMaskText());
         startSearch(root, options);
+    }
+
+    private String currentMaskText() {
+        if (maskField.getEditor() != null) {
+            return maskField.getEditor().getText();
+        }
+        return maskField.getValue() == null ? "" : maskField.getValue();
+    }
+
+    private void rememberMask(String rawMask) {
+        String mask = rawMask == null ? "" : rawMask.trim();
+        if (mask.isEmpty()) {
+            return;
+        }
+        maskField.getItems().remove(mask);
+        maskField.getItems().add(0, mask);
+        if (maskField.getItems().size() > MASK_HISTORY_LIMIT) {
+            maskField.getItems().remove(MASK_HISTORY_LIMIT, maskField.getItems().size());
+        }
+        maskField.setValue(mask);
+        saveMaskHistory();
+    }
+
+    private void loadMaskHistory() {
+        if (!Files.isRegularFile(MASK_HISTORY_FILE)) {
+            return;
+        }
+        try {
+            String json = Files.readString(MASK_HISTORY_FILE, StandardCharsets.UTF_8);
+            List<String> items = parseMaskHistoryJson(json);
+            for (String mask : items) {
+                String trimmed = mask == null ? "" : mask.trim();
+                if (!trimmed.isEmpty() && !maskField.getItems().contains(trimmed)) {
+                    maskField.getItems().add(trimmed);
+                }
+                if (maskField.getItems().size() >= MASK_HISTORY_LIMIT) {
+                    break;
+                }
+            }
+        } catch (IOException ignored) {
+            // История масок не критична: при ошибке просто стартуем без неё.
+        }
+    }
+
+    private void saveMaskHistory() {
+        try {
+            Files.createDirectories(MASK_HISTORY_FILE.getParent());
+            String json = toMaskHistoryJson(maskField.getItems());
+            Files.writeString(MASK_HISTORY_FILE, json, StandardCharsets.UTF_8);
+        } catch (IOException ignored) {
+            // История масок не критична для основной функциональности.
+        }
+    }
+
+    private static String toMaskHistoryJson(List<String> masks) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("{\n  \"masks\": [");
+        for (int i = 0; i < masks.size(); i++) {
+            if (i > 0) {
+                sb.append(", ");
+            }
+            sb.append('"').append(escapeJson(masks.get(i))).append('"');
+        }
+        sb.append("]\n}\n");
+        return sb.toString();
+    }
+
+    private static List<String> parseMaskHistoryJson(String json) {
+        if (json == null || json.isBlank()) {
+            return List.of();
+        }
+        int arrayStart = json.indexOf('[');
+        int arrayEnd = json.lastIndexOf(']');
+        if (arrayStart < 0 || arrayEnd <= arrayStart) {
+            return List.of();
+        }
+        String body = json.substring(arrayStart + 1, arrayEnd);
+
+        List<String> out = new ArrayList<>();
+        StringBuilder current = new StringBuilder();
+        boolean inString = false;
+        boolean escaping = false;
+
+        for (int i = 0; i < body.length(); i++) {
+            char ch = body.charAt(i);
+            if (!inString) {
+                if (ch == '"') {
+                    inString = true;
+                    current.setLength(0);
+                }
+                continue;
+            }
+
+            if (escaping) {
+                switch (ch) {
+                    case '"' -> current.append('"');
+                    case '\\' -> current.append('\\');
+                    case 'n' -> current.append('\n');
+                    case 'r' -> current.append('\r');
+                    case 't' -> current.append('\t');
+                    default -> current.append(ch);
+                }
+                escaping = false;
+                continue;
+            }
+
+            if (ch == '\\') {
+                escaping = true;
+                continue;
+            }
+            if (ch == '"') {
+                out.add(current.toString());
+                inString = false;
+                continue;
+            }
+            current.append(ch);
+        }
+        return out;
+    }
+
+    private static String escapeJson(String value) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            switch (c) {
+                case '"' -> sb.append("\\\"");
+                case '\\' -> sb.append("\\\\");
+                case '\n' -> sb.append("\\n");
+                case '\r' -> sb.append("\\r");
+                case '\t' -> sb.append("\\t");
+                default -> sb.append(c);
+            }
+        }
+        return sb.toString();
     }
 
     private static List<String> parseMasks(String text) {
