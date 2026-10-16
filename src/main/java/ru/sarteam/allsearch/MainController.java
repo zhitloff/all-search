@@ -41,10 +41,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
@@ -113,6 +115,65 @@ public class MainController {
             System.getProperty("user.home"), ".all-search", "mask-history.json");
     private static final String DEFAULT_FONT_FAMILY = "monospace";
     private static final int DEFAULT_FONT_SIZE = 14;
+
+    private static final byte STYLE_NONE = 0;
+    private static final byte STYLE_KEYWORD = 1;
+    private static final byte STYLE_STRING = 2;
+    private static final byte STYLE_COMMENT = 3;
+    private static final byte STYLE_NUMBER = 4;
+    private static final byte STYLE_ANNOTATION = 5;
+    private static final byte STYLE_TAG = 6;
+    private static final byte STYLE_ATTR = 7;
+    private static final byte STYLE_PUNCT = 8;
+    private static final byte STYLE_PROPERTY = 9;
+    private static final byte STYLE_MD_HEADING = 10;
+    private static final byte STYLE_MD_CODE = 11;
+    private static final byte STYLE_MD_LINK = 12;
+    private static final byte STYLE_MD_QUOTE = 13;
+    private static final byte STYLE_MD_LIST = 14;
+
+    private static final Pattern JAVA_LIKE_PATTERN = Pattern.compile(
+            "(?<COMMENT>//[^\\n]*|/\\*(?:.|\\R)*?\\*/)|"
+                    + "(?<STRING>\"(?:\\\\.|[^\"\\\\])*\"|'(?:\\\\.|[^'\\\\])*')|"
+                    + "(?<ANNOT>@[A-Za-z_][A-Za-z0-9_]*)|"
+                    + "(?<NUMBER>\\b\\d+(?:\\.\\d+)?\\b)|"
+                    + "(?<KEYWORD>\\b(?:abstract|assert|boolean|break|byte|case|catch|char|class|const|continue|default|do|double|else|"
+                    + "enum|extends|final|finally|float|for|goto|if|implements|import|instanceof|int|interface|long|native|new|package|"
+                    + "private|protected|public|return|short|static|strictfp|super|switch|synchronized|this|throw|throws|transient|try|"
+                    + "void|volatile|while|var|record|sealed|permits|yield|non-sealed|fun|val|let|fn|struct|impl|trait|use|namespace)\\b)",
+            Pattern.MULTILINE
+    );
+
+    private static final Pattern JSON_PATTERN = Pattern.compile(
+            "(?<STRING>\"(?:\\\\.|[^\"\\\\])*\")|"
+                    + "(?<NUMBER>-?\\b\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?\\b)|"
+                    + "(?<KEYWORD>\\b(?:true|false|null)\\b)|"
+                    + "(?<PUNCT>[{}\\[\\]:,])"
+    );
+
+    private static final Pattern XML_HTML_PATTERN = Pattern.compile(
+            "(?<COMMENT><!--(?:.|\\R)*?-->)|"
+                    + "(?<TAG></?[A-Za-z_:][A-Za-z0-9:._-]*)|"
+                    + "(?<ATTR>[A-Za-z_:][A-Za-z0-9:._-]*(?=\\s*=))|"
+                    + "(?<STRING>\"[^\"]*\"|'[^']*')",
+            Pattern.MULTILINE
+    );
+
+    private static final Pattern CSS_PATTERN = Pattern.compile(
+            "(?<COMMENT>/\\*(?:.|\\R)*?\\*/)|"
+                    + "(?<PROPERTY>\\b[a-zA-Z-]+(?=\\s*:))|"
+                    + "(?<NUMBER>\\b\\d+(?:\\.\\d+)?(?:px|em|rem|%|vh|vw|s|ms)?\\b)|"
+                    + "(?<PUNCT>[{}:;(),.])|"
+                    + "(?<STRING>\"(?:\\\\.|[^\"\\\\])*\"|'(?:\\\\.|[^'\\\\])*')",
+            Pattern.MULTILINE
+    );
+
+    private static final Pattern MD_CODE_FENCE = Pattern.compile("(?ms)^```.*?$.*?^```\\s*$");
+    private static final Pattern MD_HEADING = Pattern.compile("(?m)^#{1,6}\\s.*$");
+    private static final Pattern MD_QUOTE = Pattern.compile("(?m)^>.*$");
+    private static final Pattern MD_LIST = Pattern.compile("(?m)^\\s*(?:[-*+]\\s+.*|\\d+\\.\\s+.*)$");
+    private static final Pattern MD_LINK = Pattern.compile("\\[[^\\]]+\\]\\([^\\)]+\\)");
+    private static final Pattern MD_INLINE_CODE = Pattern.compile("`[^`\\n]+`");
 
     private final ObservableList<Path> files = FXCollections.observableArrayList();
     private final List<SearchEngine.Result> allResults = new ArrayList<>();
@@ -237,7 +298,7 @@ public class MainController {
             contentArea.setPrefHeight(areaHeight);
             contentArea.setMinHeight(areaHeight);
             contentArea.replaceText(0, contentArea.getLength(), text);
-            contentArea.setStyleSpans(0, buildHighlightSpans(text));
+            contentArea.setStyleSpans(0, buildHighlightSpans(file, text));
             rebuildHits(text);
             int initialHit;
             if (pendingHitIndex == null) {
@@ -606,33 +667,210 @@ public class MainController {
      * Стилевые интервалы для подсветки совпадений с последним поисковым
      * запросом (в т.ч. по рег. выражению и с учётом регистра).
      */
-    private StyleSpans<Collection<String>> buildHighlightSpans(String text) {
+    private StyleSpans<Collection<String>> buildHighlightSpans(Path file, String text) {
+        int n = text.length();
+        if (n == 0) {
+            return new StyleSpansBuilder<Collection<String>>().create();
+        }
+
+        byte[] syntax = new byte[n];
+        byte[] search = new byte[n];
+
+        applySyntaxStyles(file, text, syntax);
+        applySearchStyles(text, search);
+
         StyleSpansBuilder<Collection<String>> builder = new StyleSpansBuilder<>();
-        Pattern pattern = compileHighlightPattern();
-        int pos = 0;
-        if (pattern != null) {
-            Matcher matcher = pattern.matcher(text);
-            int count = 0;
-            while (matcher.find()) {
-                int start = matcher.start();
-                int end = matcher.end();
-                if (end == start) {
-                    continue; // пустые совпадения не подсвечиваем
-                }
-                if (start > pos) {
-                    builder.add(Collections.emptyList(), start - pos);
-                }
-                builder.add(Collections.singleton("search-hit"), end - start);
-                pos = end;
-                if (++count >= MAX_HIGHLIGHTS) {
-                    break; // предохранитель от огромного числа фрагментов
-                }
+        int runStart = 0;
+        int prevKey = ((syntax[0] & 0xFF) << 1) | (search[0] & 0x01);
+
+        for (int i = 1; i < n; i++) {
+            int key = ((syntax[i] & 0xFF) << 1) | (search[i] & 0x01);
+            if (key != prevKey) {
+                builder.add(classesFor(prevKey), i - runStart);
+                runStart = i;
+                prevKey = key;
             }
         }
-        if (pos < text.length()) {
-            builder.add(Collections.emptyList(), text.length() - pos);
-        }
+        builder.add(classesFor(prevKey), n - runStart);
         return builder.create();
+    }
+
+    private void applySearchStyles(String text, byte[] search) {
+        Pattern pattern = compileHighlightPattern();
+        if (pattern == null) {
+            return;
+        }
+        Matcher matcher = pattern.matcher(text);
+        int count = 0;
+        while (matcher.find()) {
+            int start = matcher.start();
+            int end = matcher.end();
+            if (end > start) {
+                paint(search, start, end, (byte) 1, true);
+            }
+            if (++count >= MAX_HIGHLIGHTS) {
+                break;
+            }
+        }
+    }
+
+    private void applySyntaxStyles(Path file, String text, byte[] syntax) {
+        String ext = extensionOf(file);
+        if (isMarkdown(ext)) {
+            applyMarkdownStyles(text, syntax);
+            return;
+        }
+        if (isJson(ext)) {
+            applyJsonStyles(text, syntax);
+            return;
+        }
+        if (isXmlLike(ext)) {
+            applyXmlHtmlStyles(text, syntax);
+            return;
+        }
+        if (isCssLike(ext)) {
+            applyCssStyles(text, syntax);
+            return;
+        }
+        if (isCodeLike(ext)) {
+            applyCodeStyles(text, syntax);
+        }
+    }
+
+    private void applyCodeStyles(String text, byte[] syntax) {
+        Matcher m = JAVA_LIKE_PATTERN.matcher(text);
+        while (m.find()) {
+            if (m.group("COMMENT") != null) paint(syntax, m.start(), m.end(), STYLE_COMMENT, false);
+            else if (m.group("STRING") != null) paint(syntax, m.start(), m.end(), STYLE_STRING, false);
+            else if (m.group("ANNOT") != null) paint(syntax, m.start(), m.end(), STYLE_ANNOTATION, false);
+            else if (m.group("NUMBER") != null) paint(syntax, m.start(), m.end(), STYLE_NUMBER, false);
+            else if (m.group("KEYWORD") != null) paint(syntax, m.start(), m.end(), STYLE_KEYWORD, false);
+        }
+    }
+
+    private void applyJsonStyles(String text, byte[] syntax) {
+        Matcher m = JSON_PATTERN.matcher(text);
+        while (m.find()) {
+            if (m.group("STRING") != null) paint(syntax, m.start(), m.end(), STYLE_STRING, false);
+            else if (m.group("NUMBER") != null) paint(syntax, m.start(), m.end(), STYLE_NUMBER, false);
+            else if (m.group("KEYWORD") != null) paint(syntax, m.start(), m.end(), STYLE_KEYWORD, false);
+            else if (m.group("PUNCT") != null) paint(syntax, m.start(), m.end(), STYLE_PUNCT, false);
+        }
+    }
+
+    private void applyXmlHtmlStyles(String text, byte[] syntax) {
+        Matcher m = XML_HTML_PATTERN.matcher(text);
+        while (m.find()) {
+            if (m.group("COMMENT") != null) paint(syntax, m.start(), m.end(), STYLE_COMMENT, false);
+            else if (m.group("TAG") != null) paint(syntax, m.start(), m.end(), STYLE_TAG, false);
+            else if (m.group("ATTR") != null) paint(syntax, m.start(), m.end(), STYLE_ATTR, false);
+            else if (m.group("STRING") != null) paint(syntax, m.start(), m.end(), STYLE_STRING, false);
+        }
+    }
+
+    private void applyCssStyles(String text, byte[] syntax) {
+        Matcher m = CSS_PATTERN.matcher(text);
+        while (m.find()) {
+            if (m.group("COMMENT") != null) paint(syntax, m.start(), m.end(), STYLE_COMMENT, false);
+            else if (m.group("PROPERTY") != null) paint(syntax, m.start(), m.end(), STYLE_PROPERTY, false);
+            else if (m.group("NUMBER") != null) paint(syntax, m.start(), m.end(), STYLE_NUMBER, false);
+            else if (m.group("PUNCT") != null) paint(syntax, m.start(), m.end(), STYLE_PUNCT, false);
+            else if (m.group("STRING") != null) paint(syntax, m.start(), m.end(), STYLE_STRING, false);
+        }
+    }
+
+    private void applyMarkdownStyles(String text, byte[] syntax) {
+        paintByPattern(MD_CODE_FENCE, text, syntax, STYLE_MD_CODE);
+        paintByPattern(MD_HEADING, text, syntax, STYLE_MD_HEADING);
+        paintByPattern(MD_QUOTE, text, syntax, STYLE_MD_QUOTE);
+        paintByPattern(MD_LIST, text, syntax, STYLE_MD_LIST);
+        paintByPattern(MD_LINK, text, syntax, STYLE_MD_LINK);
+        paintByPattern(MD_INLINE_CODE, text, syntax, STYLE_MD_CODE);
+    }
+
+    private void paintByPattern(Pattern pattern, String text, byte[] syntax, byte style) {
+        Matcher m = pattern.matcher(text);
+        while (m.find()) {
+            if (m.end() > m.start()) {
+                paint(syntax, m.start(), m.end(), style, false);
+            }
+        }
+    }
+
+    private static void paint(byte[] target, int start, int end, byte style, boolean overwrite) {
+        int s = Math.max(0, start);
+        int e = Math.min(target.length, end);
+        for (int i = s; i < e; i++) {
+            if (overwrite || target[i] == STYLE_NONE) {
+                target[i] = style;
+            }
+        }
+    }
+
+    private static Collection<String> classesFor(int key) {
+        byte syntax = (byte) ((key >> 1) & 0x7F);
+        boolean hit = (key & 0x01) == 1;
+        String syntaxClass = syntaxClassName(syntax);
+        if (syntaxClass == null) {
+            return hit ? Collections.singleton("search-hit") : Collections.emptyList();
+        }
+        return hit ? Arrays.asList(syntaxClass, "search-hit") : Collections.singleton(syntaxClass);
+    }
+
+    private static String syntaxClassName(byte style) {
+        return switch (style) {
+            case STYLE_KEYWORD -> "syn-keyword";
+            case STYLE_STRING -> "syn-string";
+            case STYLE_COMMENT -> "syn-comment";
+            case STYLE_NUMBER -> "syn-number";
+            case STYLE_ANNOTATION -> "syn-annotation";
+            case STYLE_TAG -> "syn-tag";
+            case STYLE_ATTR -> "syn-attr";
+            case STYLE_PUNCT -> "syn-punct";
+            case STYLE_PROPERTY -> "syn-property";
+            case STYLE_MD_HEADING -> "syn-md-heading";
+            case STYLE_MD_CODE -> "syn-md-code";
+            case STYLE_MD_LINK -> "syn-md-link";
+            case STYLE_MD_QUOTE -> "syn-md-quote";
+            case STYLE_MD_LIST -> "syn-md-list";
+            default -> null;
+        };
+    }
+
+    private static String extensionOf(Path file) {
+        if (file == null || file.getFileName() == null) {
+            return "";
+        }
+        String name = file.getFileName().toString();
+        int dot = name.lastIndexOf('.');
+        if (dot < 0 || dot == name.length() - 1) {
+            return "";
+        }
+        return name.substring(dot + 1).toLowerCase(Locale.ROOT);
+    }
+
+    private static boolean isMarkdown(String ext) {
+        return ext.equals("md") || ext.equals("markdown");
+    }
+
+    private static boolean isJson(String ext) {
+        return ext.equals("json") || ext.equals("json5");
+    }
+
+    private static boolean isXmlLike(String ext) {
+        return ext.equals("xml") || ext.equals("html") || ext.equals("htm") || ext.equals("xhtml") || ext.equals("svg");
+    }
+
+    private static boolean isCssLike(String ext) {
+        return ext.equals("css") || ext.equals("scss") || ext.equals("less");
+    }
+
+    private static boolean isCodeLike(String ext) {
+        return ext.equals("java") || ext.equals("kt") || ext.equals("kts")
+                || ext.equals("js") || ext.equals("jsx") || ext.equals("ts") || ext.equals("tsx")
+                || ext.equals("c") || ext.equals("h") || ext.equals("cpp") || ext.equals("hpp")
+                || ext.equals("cs") || ext.equals("go") || ext.equals("rs") || ext.equals("swift")
+                || ext.equals("py") || ext.equals("php") || ext.equals("sql") || ext.equals("groovy");
     }
 
     /** Паттерн для подсветки — те же правила, что у движка поиска. */

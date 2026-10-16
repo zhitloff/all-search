@@ -4,6 +4,22 @@
     -fx-font-weight: bold;
 }
 
+.syn-keyword { -fx-fill: #0000cc; -fx-font-weight: bold; }
+.syn-string { -fx-fill: #b03060; }
+.syn-comment { -fx-fill: #6a9955; -fx-font-style: italic; }
+.syn-number { -fx-fill: #8a2be2; }
+.syn-annotation { -fx-fill: #aa5500; }
+.syn-tag { -fx-fill: #0033aa; -fx-font-weight: bold; }
+.syn-attr { -fx-fill: #795e26; }
+.syn-punct { -fx-fill: #444444; }
+.syn-property { -fx-fill: #005a9c; }
+
+.syn-md-heading { -fx-fill: #1f4e79; -fx-font-weight: bold; }
+.syn-md-code { -fx-fill: #7a3e00; }
+.syn-md-link { -fx-fill: #0b61a4; -fx-underline: true; }
+.syn-md-quote { -fx-fill: #5c7a5c; }
+.syn-md-list { -fx-fill: #444444; }
+
 /* Область с текстом (CodeArea) и её текст должны иметь один шрифт. */
 .content-area {
     -fx-font-family: monospace;
