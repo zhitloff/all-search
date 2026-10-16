@@ -24,7 +24,6 @@ import javafx.scene.input.MouseButton;
 import javafx.scene.input.ScrollEvent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
-import javafx.scene.layout.StackPane;
 import javafx.scene.text.Font;
 import javafx.scene.text.Text;
 import javafx.stage.DirectoryChooser;
@@ -101,8 +100,6 @@ public class MainController {
     @FXML
     private Label lineNumberHighlightLabel;
     @FXML
-    private StackPane lineNumberPane;
-    @FXML
     private Label statusLabel;
     @FXML
     private ProgressBar progressBar;
@@ -126,6 +123,7 @@ public class MainController {
     private List<String> allFontFamilies = List.of();
     private final SearchResultNavigator resultNavigator = new SearchResultNavigator();
     private final SyntaxHighlighter syntaxHighlighter = new SyntaxHighlighter();
+    private LineNumberView lineNumbers;
 
     /** RichTextFX-область для показа содержимого файла (создаётся в {@link #initialize()}). */
     private CodeArea contentArea;
@@ -138,6 +136,7 @@ public class MainController {
     @FXML
     private void initialize() {
         fileNameColumn.setCellValueFactory(cell -> new ReadOnlyStringWrapper(cell.getValue().getFileName().toString()));
+        lineNumbers = new LineNumberView(lineNumberLabel, lineNumberHighlightLabel);
 
         fileTable.setItems(files);
 
@@ -205,8 +204,7 @@ public class MainController {
     /** Показывает содержимое выбранного слева файла в правой панели, подсвечивая найденный текст. */
     private void showFileContent(Path file) {
         if (file == null) {
-            lineNumberLabel.setText("");
-            lineNumberHighlightLabel.setText("");
+            lineNumbers.clear();
             contentArea.replaceText(0, contentArea.getLength(), "");
             resultNavigator.clear();
             updateFileMatchesLabel();
@@ -222,12 +220,11 @@ public class MainController {
             }
             int lineCount = countLines(text);
             currentLineCount = Math.max(1, lineCount);
-            rebuildLineNumbers(lineCount);
-            lineNumberHighlightLabel.setText("");
+            lineNumbers.setLineCount(lineCount);
             // Номера и текст должны иметь одинаковую высоту строк, иначе они разъедутся.
             // Высоту текстовой области задаём равной высоте колонки номеров плюс запас
             // на несколько строк, чтобы последняя строка файла не обрезалась.
-            double contentHeight = lineNumberLabel.prefHeight(-1);
+            double contentHeight = lineNumbers.prefHeight();
             double lineHeight = Math.max(1, contentHeight / lineCount);
             double areaHeight = contentHeight + 3 * lineHeight;
             contentArea.setPrefHeight(areaHeight);
@@ -241,11 +238,10 @@ public class MainController {
             focusHit(initialHit);
             contentArea.requestLayout();
             // Ширина ряда: не уже панели, но достаточно, чтобы поместилась самая длинная строка.
-            rowContentWidth = lineNumberLabel.prefWidth(-1) + widestLineWidth(text, Font.font(currentFontFamily(), currentFontSize()));
+            rowContentWidth = lineNumbers.prefWidth() + widestLineWidth(text, Font.font(currentFontFamily(), currentFontSize()));
             updateRowWidth();
         } catch (IOException e) {
-            lineNumberLabel.setText("");
-            lineNumberHighlightLabel.setText("");
+            lineNumbers.clear();
             contentArea.replaceText(0, contentArea.getLength(), "");
             currentLineCount = 1;
             resultNavigator.clear();
@@ -274,7 +270,7 @@ public class MainController {
 
     private void focusHit(int index) {
         if (resultNavigator.isEmpty()) {
-            lineNumberHighlightLabel.setText("");
+            lineNumbers.clear();
             updateFileMatchesLabel();
             updateHitButtons();
             return;
@@ -285,7 +281,7 @@ public class MainController {
         contentArea.selectRange(hit.start(), hit.end());
         int line = lineFromOffsetInContent(hit.start());
         int paragraph = line - 1;
-        highlightLineNumber(line);
+        lineNumbers.highlight(line);
         updateFileMatchesLabel();
         scrollToParagraph(paragraph);
         updateHitButtons();
@@ -436,8 +432,7 @@ public class MainController {
         String escaped = safeFamily.replace("'", "\\'");
 
         contentArea.setStyle("-fx-font-family: '" + escaped + "'; -fx-font-size: " + px + "px;");
-        lineNumberLabel.setStyle("-fx-font-family: '" + escaped + "'; -fx-font-size: " + px + "px;");
-        lineNumberHighlightLabel.setStyle("-fx-font-family: '" + escaped + "'; -fx-font-size: " + px + "px;");
+        lineNumbers.setFont(safeFamily, px);
 
         Path selected = fileTable.getSelectionModel().getSelectedItem();
         if (selected != null) {
@@ -457,50 +452,6 @@ public class MainController {
     }
 
     /** Номера строк от 1 до {@code count}, по одному на строку. */
-    private static String buildLineNumbers(int count, int widthChars) {
-        String format = "%" + Math.max(1, widthChars) + "d";
-        StringBuilder sb = new StringBuilder(count * (Math.max(1, widthChars) + 1));
-        for (int i = 1; i <= count; i++) {
-            if (i > 1) {
-                sb.append('\n');
-            }
-            sb.append(String.format(Locale.ROOT, format, i));
-        }
-        return sb.toString();
-    }
-
-    private void rebuildLineNumbers(int count) {
-        int widthChars = String.valueOf(Math.max(1, count)).length();
-        lineNumberLabel.setText(buildLineNumbers(count, widthChars));
-        lineNumberHighlightLabel.setText("");
-    }
-
-    private void highlightLineNumber(int line1Based) {
-        if (line1Based <= 0 || line1Based > currentLineCount) {
-            lineNumberHighlightLabel.setText("");
-            return;
-        }
-        int widthChars = String.valueOf(Math.max(1, currentLineCount)).length();
-        lineNumberHighlightLabel.setText(buildSingleLineNumbers(currentLineCount, line1Based, widthChars));
-    }
-
-    private static String buildSingleLineNumbers(int count, int highlightedLine1Based, int widthChars) {
-        String format = "%" + Math.max(1, widthChars) + "d";
-        String blank = " ".repeat(Math.max(1, widthChars));
-        StringBuilder sb = new StringBuilder(count * (Math.max(1, widthChars) + 1));
-        for (int i = 1; i <= count; i++) {
-            if (i > 1) {
-                sb.append('\n');
-            }
-            if (i == highlightedLine1Based) {
-                sb.append(String.format(Locale.ROOT, format, i));
-            } else {
-                sb.append(blank);
-            }
-        }
-        return sb.toString();
-    }
-
     /**
      * Ширина ряда с номерами и текстом: не уже видимой панели, но достаточно,
      * чтобы поместилась самая длинная строка файла (тогда появится горизонтальная
@@ -700,8 +651,7 @@ public class MainController {
         lastRegex = options.regex();
         lastCaseSensitive = options.caseSensitive();
         files.clear();
-        lineNumberLabel.setText("");
-        lineNumberHighlightLabel.setText("");
+        lineNumbers.clear();
         contentArea.replaceText(0, contentArea.getLength(), "");
         resultNavigator.clear();
         updateFileMatchesLabel();
