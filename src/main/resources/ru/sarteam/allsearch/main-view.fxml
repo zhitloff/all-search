@@ -15,6 +15,7 @@
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.VBox?>
+<?import javafx.scene.text.TextFlow?>
 
 <BorderPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="ru.sarteam.allsearch.MainController">
@@ -58,7 +59,7 @@
             </TableView>
             <ScrollPane fx:id="textScrollPane" hbarPolicy="AS_NEEDED" vbarPolicy="AS_NEEDED">
                 <HBox fx:id="contentRow" spacing="0.0">
-                    <Label fx:id="lineNumberLabel" textAlignment="RIGHT" alignment="TOP_RIGHT"/>
+                    <TextFlow fx:id="lineNumberLabel" textAlignment="RIGHT"/>
                 </HBox>
             </ScrollPane>
         </SplitPane>
@@ -70,6 +71,7 @@
             </padding>
             <Label fx:id="statusLabel" text="Готов к поиску" HBox.hgrow="ALWAYS"/>
             <ProgressBar fx:id="progressBar" prefWidth="160.0" progress="0.0"/>
+            <Label fx:id="fileMatchesLabel" text="Совпадений в файле: 0"/>
         </HBox>
     </bottom>
 </BorderPane>

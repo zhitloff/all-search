@@ -26,6 +26,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.text.Font;
 import javafx.scene.text.Text;
+import javafx.scene.text.TextFlow;
 import javafx.stage.DirectoryChooser;
 
 import org.fxmisc.richtext.CodeArea;
@@ -102,11 +103,13 @@ public class MainController {
     @FXML
     private HBox contentRow;
     @FXML
-    private Label lineNumberLabel;
+    private TextFlow lineNumberLabel;
     @FXML
     private Label statusLabel;
     @FXML
     private ProgressBar progressBar;
+    @FXML
+    private Label fileMatchesLabel;
 
     private static final int MAX_DISPLAY_CHARS = 2_000_000;
     private static final int MAX_HIGHLIGHTS = 5_000;
@@ -199,6 +202,7 @@ public class MainController {
     private double rowContentWidth;
     /** Количество строк в тексте, который сейчас показан справа. */
     private int currentLineCount = 1;
+    private int lineNumberColumnWidthChars = 1;
 
     @FXML
     private void initialize() {
@@ -267,17 +271,19 @@ public class MainController {
         fileTable.getSelectionModel().selectedItemProperty().addListener((obs, oldFile, newFile) -> showFileContent(newFile));
 
         progressBar.setProgress(0.0);
+        fileMatchesLabel.setText("Совпадений в файле: 0");
         statusLabel.setText("Укажите папку и текст, затем нажмите «Искать». Двойной щелчок открывает файл.");
     }
 
     /** Показывает содержимое выбранного слева файла в правой панели, подсвечивая найденный текст. */
     private void showFileContent(Path file) {
         if (file == null) {
-            lineNumberLabel.setText("");
+            lineNumberLabel.getChildren().clear();
             contentArea.replaceText(0, contentArea.getLength(), "");
             currentHits.clear();
             currentHitIndex = -1;
             pendingHitIndex = null;
+            updateFileMatchesLabel();
             updateHitButtons();
             return;
         }
@@ -290,7 +296,8 @@ public class MainController {
             }
             int lineCount = countLines(text);
             currentLineCount = Math.max(1, lineCount);
-            lineNumberLabel.setText(buildLineNumbers(lineCount));
+            lineNumberColumnWidthChars = String.valueOf(currentLineCount).length();
+            rebuildLineNumbers(lineCount, -1);
             // Номера и текст должны иметь одинаковую высоту строк, иначе они разъедутся.
             // Высоту текстовой области задаём равной высоте колонки номеров плюс запас
             // на несколько строк, чтобы последняя строка файла не обрезалась.
@@ -302,6 +309,7 @@ public class MainController {
             contentArea.replaceText(0, contentArea.getLength(), text);
             contentArea.setStyleSpans(0, buildHighlightSpans(file, text));
             rebuildHits(text);
+            updateFileMatchesLabel();
             int initialHit;
             if (pendingHitIndex == null) {
                 initialHit = 0;
@@ -317,12 +325,13 @@ public class MainController {
             rowContentWidth = lineNumberLabel.prefWidth(-1) + widestLineWidth(text, Font.font(currentFontFamily(), currentFontSize()));
             updateRowWidth();
         } catch (IOException e) {
-            lineNumberLabel.setText("");
+            lineNumberLabel.getChildren().clear();
             contentArea.replaceText(0, contentArea.getLength(), "");
             currentLineCount = 1;
             currentHits.clear();
             currentHitIndex = -1;
             pendingHitIndex = null;
+            updateFileMatchesLabel();
             updateHitButtons();
             statusLabel.setText("Не удалось прочитать файл: " + e.getMessage());
         }
@@ -348,12 +357,17 @@ public class MainController {
     private void focusHit(int index) {
         if (currentHits.isEmpty()) {
             currentHitIndex = -1;
+            rebuildLineNumbers(currentLineCount, -1);
+            updateFileMatchesLabel();
             updateHitButtons();
             return;
         }
         int safeIndex = Math.max(0, Math.min(currentHits.size() - 1, index));
         currentHitIndex = safeIndex;
         int[] hit = currentHits.get(safeIndex);
+        int line = contentArea.offsetToPosition(hit[0], TwoDimensional.Bias.Forward).getMajor() + 1;
+        rebuildLineNumbers(currentLineCount, line);
+        updateFileMatchesLabel();
         contentArea.requestFocus();
         contentArea.selectRange(hit[0], hit[1]);
         int paragraph = contentArea.offsetToPosition(hit[0], TwoDimensional.Bias.Forward).getMajor();
@@ -565,6 +579,14 @@ public class MainController {
 
         contentArea.setStyle("-fx-font-family: '" + escaped + "'; -fx-font-size: " + px + "px;");
         lineNumberLabel.setStyle("-fx-font-family: '" + escaped + "'; -fx-font-size: " + px + "px;");
+        if (currentLineCount > 0) {
+            int activeLine = -1;
+            if (!currentHits.isEmpty() && currentHitIndex >= 0 && currentHitIndex < currentHits.size()) {
+                int[] hit = currentHits.get(currentHitIndex);
+                activeLine = contentArea.offsetToPosition(hit[0], TwoDimensional.Bias.Forward).getMajor() + 1;
+            }
+            rebuildLineNumbers(currentLineCount, activeLine);
+        }
 
         Path selected = fileTable.getSelectionModel().getSelectedItem();
         if (selected != null) {
@@ -584,15 +606,34 @@ public class MainController {
     }
 
     /** Номера строк от 1 до {@code count}, по одному на строку. */
-    private static String buildLineNumbers(int count) {
-        StringBuilder sb = new StringBuilder(count * 4);
+    private static String buildLineNumbers(int count, int widthChars) {
+        String format = "%" + Math.max(1, widthChars) + "d";
+        StringBuilder sb = new StringBuilder(count * (Math.max(1, widthChars) + 1));
         for (int i = 1; i <= count; i++) {
             if (i > 1) {
                 sb.append('\n');
             }
-            sb.append(i);
+            sb.append(String.format(Locale.ROOT, format, i));
         }
         return sb.toString();
+    }
+
+    private void rebuildLineNumbers(int count, int highlightedLine1Based) {
+        lineNumberLabel.getChildren().clear();
+        String format = "%" + Math.max(1, lineNumberColumnWidthChars) + "d";
+        for (int i = 1; i <= count; i++) {
+            String line = String.format(Locale.ROOT, format, i);
+            if (i < count) {
+                line += "\n";
+            }
+            Text t = new Text(line);
+            if (i == highlightedLine1Based) {
+                t.setStyle("-fx-fill: #c00000; -fx-font-weight: bold;");
+            } else {
+                t.setStyle("-fx-fill: #888888;");
+            }
+            lineNumberLabel.getChildren().add(t);
+        }
     }
 
     /**
@@ -1266,8 +1307,11 @@ public class MainController {
         lastRegex = options.regex();
         lastCaseSensitive = options.caseSensitive();
         files.clear();
-        lineNumberLabel.setText("");
+        lineNumberLabel.getChildren().clear();
         contentArea.replaceText(0, contentArea.getLength(), "");
+        currentHits.clear();
+        currentHitIndex = -1;
+        updateFileMatchesLabel();
         allResults.clear();
         setRunning(true);
 
@@ -1312,6 +1356,16 @@ public class MainController {
         progressBar.setProgress(0.0);
         setRunning(false);
         statusLabel.setText(message);
+    }
+
+    private void updateFileMatchesLabel() {
+        int total = currentHits.size();
+        if (total <= 0) {
+            fileMatchesLabel.setText("Совпадений в файле: 0");
+            return;
+        }
+        int current = currentHitIndex >= 0 ? currentHitIndex + 1 : 1;
+        fileMatchesLabel.setText("Совпадений в файле: " + total + " (текущее: " + current + ")");
     }
 
     @FXML
