@@ -11,10 +11,8 @@ import java.nio.file.Path;
 import java.nio.file.PathMatcher;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
-import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /**
@@ -76,10 +74,9 @@ public final class SearchEngine {
     public List<Result> search(Path root, Options options, Consumer<String> onFile, Consumer<Path> onMatchedFile) {
         cancelled.set(false);
         List<Result> results = new ArrayList<>();
-        Pattern pattern = options.regex() ? compileRegex(options.query(), options.caseSensitive()) : null;
-        String needle = options.caseSensitive() ? options.query() : options.query().toLowerCase(Locale.ROOT);
+        SearchPattern pattern = new SearchPattern(options.query(), options.regex(), options.caseSensitive());
         List<PathMatcher> matchers = compileMasks(options.masks());
-        walk(root, options, pattern, needle, matchers, results, onFile, onMatchedFile);
+        walk(root, options, pattern, matchers, results, onFile, onMatchedFile);
         return results;
     }
 
@@ -92,7 +89,7 @@ public final class SearchEngine {
         return TextFileReader.read(file);
     }
 
-    private void walk(Path dir, Options options, Pattern pattern, String needle, List<PathMatcher> matchers,
+    private void walk(Path dir, Options options, SearchPattern pattern, List<PathMatcher> matchers,
                       List<Result> results, Consumer<String> onFile, Consumer<Path> onMatchedFile) {
         if (cancelled.get()) {
             return;
@@ -121,14 +118,14 @@ public final class SearchEngine {
             if (cancelled.get()) {
                 return;
             }
-            searchFile(file, options, pattern, needle, matchers, results, onFile, onMatchedFile);
+            searchFile(file, options, pattern, matchers, results, onFile, onMatchedFile);
         }
         for (Path sub : dirs) {
-            walk(sub, options, pattern, needle, matchers, results, onFile, onMatchedFile);
+            walk(sub, options, pattern, matchers, results, onFile, onMatchedFile);
         }
     }
 
-    private void searchFile(Path file, Options options, Pattern pattern, String needle, List<PathMatcher> matchers,
+    private void searchFile(Path file, Options options, SearchPattern pattern, List<PathMatcher> matchers,
                             List<Result> results, Consumer<String> onFile, Consumer<Path> onMatchedFile) {
         if (!matchesMask(file, matchers)) {
             return;
@@ -155,7 +152,7 @@ public final class SearchEngine {
             String line;
             while ((line = reader.readLine()) != null) {
                 lineNo++;
-                if (matches(line, pattern, needle, options)) {
+                if (pattern.matches(line)) {
                     if (!matchedFileNotified && onMatchedFile != null) {
                         onMatchedFile.accept(file);
                         matchedFileNotified = true;
@@ -172,21 +169,6 @@ public final class SearchEngine {
         } catch (IOException e) {
             // со StringReader не должно случаться, но не прерываем обход
         }
-    }
-
-    private static boolean matches(String line, Pattern pattern, String needle, Options options) {
-        if (pattern != null) {
-            return pattern.matcher(line).find();
-        }
-        if (options.caseSensitive()) {
-            return line.contains(needle);
-        }
-        return line.toLowerCase(Locale.ROOT).contains(needle);
-    }
-
-    private static Pattern compileRegex(String query, boolean caseSensitive) {
-        int flags = caseSensitive ? 0 : Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE;
-        return Pattern.compile(query, flags);
     }
 
     private static List<PathMatcher> compileMasks(List<String> masks) {

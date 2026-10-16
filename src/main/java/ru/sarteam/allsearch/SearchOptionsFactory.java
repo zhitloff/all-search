@@ -2,7 +2,6 @@ package ru.sarteam.allsearch;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.regex.Pattern;
 
 /** Создаёт параметры поиска из значений элементов управления. */
 final class SearchOptionsFactory {
@@ -10,9 +9,7 @@ final class SearchOptionsFactory {
     SearchEngine.Options create(String query, boolean regex, boolean caseSensitive,
                                 String masksText, boolean textOnly) {
         String safeQuery = query == null ? "" : query;
-        if (regex) {
-            Pattern.compile(safeQuery);
-        }
+        new SearchPattern(safeQuery, regex, caseSensitive);
         return new SearchEngine.Options(
                 safeQuery,
                 regex,

@@ -2,6 +2,7 @@ package ru.sarteam.allsearch;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.List;
 
@@ -17,7 +18,7 @@ class SearchResultNavigatorTest {
         SearchResultNavigator.Navigation next = navigator.next(0, 2);
 
         assertEquals(1, next.hitIndex());
-        assertNull(next.fileDirection());
+        assertNull(next.fileIndex());
     }
 
     @Test
@@ -28,6 +29,7 @@ class SearchResultNavigatorTest {
         SearchResultNavigator.Navigation next = navigator.next(0, 2);
 
         assertEquals(1, next.fileDirection());
+        assertEquals(1, next.fileIndex());
         assertNull(next.hitIndex());
     }
 
@@ -39,7 +41,7 @@ class SearchResultNavigatorTest {
         SearchResultNavigator.Navigation previous = navigator.previous(0, 1);
 
         assertEquals(1, previous.hitIndex());
-        assertNull(previous.fileDirection());
+        assertNull(previous.fileIndex());
     }
 
     @Test
@@ -58,6 +60,31 @@ class SearchResultNavigatorTest {
         navigator.setPendingHitForFileDirection(-1);
 
         assertEquals(2, navigator.initialHitIndex());
+    }
+
+    @Test
+    void wrapsAcrossFileBoundariesAndPreservesPendingSelection() {
+        SearchResultNavigator navigator = navigatorWithHits(2);
+        navigator.selectIndex(1);
+        assertEquals(0, navigator.next(2, 3).fileIndex());
+        navigator.setHits(List.of(new SearchResultNavigator.Hit(4, 6)));
+        assertEquals(0, navigator.initialHitIndex());
+        navigator.selectIndex(0);
+        assertEquals(2, navigator.previous(0, 3).fileIndex());
+        navigator.setHits(List.of(new SearchResultNavigator.Hit(0, 1), new SearchResultNavigator.Hit(2, 3)));
+        assertEquals(1, navigator.initialHitIndex());
+    }
+
+    @Test
+    void protectsHitsAndClearsNavigationState() {
+        SearchResultNavigator navigator = navigatorWithHits(2);
+        assertThrows(UnsupportedOperationException.class, () -> navigator.hits().clear());
+        navigator.setPendingHitForFileDirection(-1);
+        navigator.clear();
+        assertNull(navigator.next(0, 2));
+        assertNull(navigator.previous(0, 2));
+        assertEquals(-1, navigator.currentHitIndex());
+        assertEquals(0, navigator.initialHitIndex());
     }
 
     private static SearchResultNavigator navigatorWithHits(int count) {

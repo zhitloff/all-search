@@ -1,6 +1,5 @@
 package ru.sarteam.allsearch;
 
-import java.util.ArrayList;
 import java.util.List;
 
 /** Состояние и правила навигации по совпадениям текущего поиска. */
@@ -8,28 +7,27 @@ final class SearchResultNavigator {
 
     record Hit(int start, int end) {}
 
-    record Navigation(Integer hitIndex, Integer fileDirection) {
+    record Navigation(Integer hitIndex, Integer fileIndex, int fileDirection) {
         static Navigation hit(int index) {
-            return new Navigation(index, null);
+            return new Navigation(index, null, 0);
         }
 
-        static Navigation file(int direction) {
-            return new Navigation(null, direction);
+        static Navigation file(int index, int direction) {
+            return new Navigation(null, index, direction);
         }
     }
 
-    private final List<Hit> hits = new ArrayList<>();
+    private List<Hit> hits = List.of();
     private int currentHitIndex = -1;
     private Integer pendingHitIndex;
 
     void setHits(List<Hit> newHits) {
-        hits.clear();
-        hits.addAll(newHits);
+        hits = List.copyOf(newHits);
         currentHitIndex = -1;
     }
 
     void clear() {
-        hits.clear();
+        hits = List.of();
         currentHitIndex = -1;
         pendingHitIndex = null;
     }
@@ -74,7 +72,7 @@ final class SearchResultNavigator {
         if (currentHitIndex >= 0 && currentHitIndex < hits.size() - 1) {
             return Navigation.hit(currentHitIndex + 1);
         }
-        return fileCount > 1 ? Navigation.file(1) : Navigation.hit(0);
+        return fileCount > 1 ? adjacentFile(currentFileIndex, fileCount, 1) : Navigation.hit(0);
     }
 
     Navigation previous(int currentFileIndex, int fileCount) {
@@ -84,7 +82,14 @@ final class SearchResultNavigator {
         if (currentHitIndex > 0) {
             return Navigation.hit(currentHitIndex - 1);
         }
-        return fileCount > 1 ? Navigation.file(-1) : Navigation.hit(hits.size() - 1);
+        return fileCount > 1 ? adjacentFile(currentFileIndex, fileCount, -1) : Navigation.hit(hits.size() - 1);
+    }
+
+    private Navigation adjacentFile(int currentIndex, int count, int direction) {
+        int safeIndex = Math.max(0, Math.min(count - 1, currentIndex));
+        int nextIndex = Math.floorMod(safeIndex + direction, count);
+        setPendingHitForFileDirection(direction);
+        return Navigation.file(nextIndex, direction);
     }
 
     int selectIndex(int index) {
