@@ -9,6 +9,7 @@ import javafx.scene.control.TextField;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TableCell;
+import javafx.scene.image.ImageView;
 import javafx.scene.input.MouseButton;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
@@ -79,7 +80,15 @@ final class ApplicationChooser {
             @Override
             protected void updateItem(InstalledApplication.Entry application, boolean empty) {
                 super.updateItem(application, empty);
-                setGraphic(empty || application == null ? null : ApplicationIcon.create(application.path()));
+                if (empty || application == null || application.icon() == null) {
+                    setGraphic(null);
+                } else {
+                    ImageView icon = new ImageView(application.icon());
+                    icon.setFitWidth(24);
+                    icon.setFitHeight(24);
+                    icon.setPreserveRatio(true);
+                    setGraphic(icon);
+                }
                 setText(null);
             }
         });

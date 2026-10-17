@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Stream;
+import javafx.scene.image.Image;
 
 /** Поиск приложений, доступных для команды «Открыть с помощью...». */
 final class InstalledApplication {
@@ -25,9 +26,11 @@ final class InstalledApplication {
         } else {
             addLinuxApplications(applications);
         }
-        return applications.values().stream()
+        List<Entry> result = applications.values().stream()
                 .sorted(Comparator.comparing(Entry::name, String.CASE_INSENSITIVE_ORDER))
                 .toList();
+        result.forEach(entry -> entry.setIcon(ApplicationIcon.create(entry.path())));
+        return result;
     }
 
     static boolean matches(Entry application, String query) {
@@ -116,7 +119,32 @@ final class InstalledApplication {
         return name;
     }
 
-    record Entry(String name, Path path) {
+    static final class Entry {
+        private final String name;
+        private final Path path;
+        private Image icon;
+
+        Entry(String name, Path path) {
+            this.name = name;
+            this.path = path;
+        }
+
+        String name() {
+            return name;
+        }
+
+        Path path() {
+            return path;
+        }
+
+        Image icon() {
+            return icon;
+        }
+
+        void setIcon(Image icon) {
+            this.icon = icon;
+        }
+
         @Override
         public String toString() {
             return name;
