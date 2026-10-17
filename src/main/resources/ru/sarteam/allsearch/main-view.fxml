@@ -50,21 +50,30 @@
         </VBox>
     </top>
     <center>
-        <SplitPane dividerPositions="0.10">
-            <TableView fx:id="fileTable">
-                <columns>
-                    <TableColumn fx:id="fileNameColumn" text="Файл" prefWidth="220.0"/>
-                </columns>
-            </TableView>
-            <ScrollPane fx:id="textScrollPane" hbarPolicy="AS_NEEDED" vbarPolicy="AS_NEEDED">
-                <HBox fx:id="contentRow" spacing="0.0">
-                    <StackPane fx:id="lineNumberPane" alignment="TOP_RIGHT">
-                        <Label fx:id="lineNumberLabel" textAlignment="RIGHT" alignment="TOP_RIGHT"/>
-                        <Label fx:id="lineNumberHighlightLabel" textAlignment="RIGHT" alignment="TOP_RIGHT" mouseTransparent="true"/>
-                    </StackPane>
-                </HBox>
-            </ScrollPane>
-        </SplitPane>
+        <VBox spacing="6.0">
+            <HBox spacing="8.0" alignment="CENTER_LEFT">
+                <padding>
+                    <Insets top="6.0" right="10.0" left="10.0" bottom="0.0"/>
+                </padding>
+                <Label text="Файл:"/>
+                <Label fx:id="selectedFilePathLabel" text="Файл не выбран" HBox.hgrow="ALWAYS"/>
+            </HBox>
+            <SplitPane dividerPositions="0.10" VBox.vgrow="ALWAYS">
+                <TableView fx:id="fileTable">
+                    <columns>
+                        <TableColumn fx:id="fileNameColumn" text="Файл" prefWidth="220.0"/>
+                    </columns>
+                </TableView>
+                <ScrollPane fx:id="textScrollPane" hbarPolicy="AS_NEEDED" vbarPolicy="AS_NEEDED">
+                    <HBox fx:id="contentRow" spacing="0.0">
+                        <StackPane fx:id="lineNumberPane" alignment="TOP_RIGHT">
+                            <Label fx:id="lineNumberLabel" textAlignment="RIGHT" alignment="TOP_RIGHT"/>
+                            <Label fx:id="lineNumberHighlightLabel" textAlignment="RIGHT" alignment="TOP_RIGHT" mouseTransparent="true"/>
+                        </StackPane>
+                    </HBox>
+                </ScrollPane>
+            </SplitPane>
+        </VBox>
     </center>
     <bottom>
         <HBox spacing="8.0" alignment="CENTER_LEFT">

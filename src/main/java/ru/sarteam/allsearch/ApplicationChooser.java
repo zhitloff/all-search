@@ -8,6 +8,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
+import javafx.scene.control.TableCell;
 import javafx.scene.input.MouseButton;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
@@ -37,6 +38,21 @@ final class ApplicationChooser {
         table.setPrefSize(720, 420);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
 
+        TableColumn<InstalledApplication.Entry, InstalledApplication.Entry> iconColumn =
+                new TableColumn<>("");
+        iconColumn.setCellValueFactory(cell -> new javafx.beans.property.ReadOnlyObjectWrapper<>(cell.getValue()));
+        iconColumn.setCellFactory(column -> new TableCell<>() {
+            @Override
+            protected void updateItem(InstalledApplication.Entry application, boolean empty) {
+                super.updateItem(application, empty);
+                setGraphic(empty || application == null ? null : ApplicationIcon.create(application.path()));
+                setText(null);
+            }
+        });
+        iconColumn.setPrefWidth(36);
+        iconColumn.setMinWidth(36);
+        iconColumn.setMaxWidth(36);
+
         TableColumn<InstalledApplication.Entry, String> nameColumn = new TableColumn<>("Приложение");
         nameColumn.setCellValueFactory(cell -> new ReadOnlyStringWrapper(cell.getValue().name()));
         nameColumn.setPrefWidth(220);
@@ -44,7 +60,7 @@ final class ApplicationChooser {
         TableColumn<InstalledApplication.Entry, String> pathColumn = new TableColumn<>("Путь");
         pathColumn.setCellValueFactory(cell -> new ReadOnlyStringWrapper(cell.getValue().path().toString()));
         pathColumn.setPrefWidth(500);
-        table.getColumns().addAll(nameColumn, pathColumn);
+        table.getColumns().addAll(iconColumn, nameColumn, pathColumn);
         table.getSelectionModel().selectFirst();
 
         TextField searchField = new TextField();

@@ -87,6 +87,8 @@ public class MainController {
     private ProgressBar progressBar;
     @FXML
     private Label fileMatchesLabel;
+    @FXML
+    private Label selectedFilePathLabel;
 
     private static final Path HISTORY_FILE = Path.of(
             System.getProperty("user.home"), ".all-search", "mask-history.json");
@@ -148,18 +150,21 @@ public class MainController {
 
         progressBar.setProgress(0.0);
         fileMatchesLabel.setText("Совпадений в файле: 0");
-        statusLabel.setText("Укажите папку и текст, затем нажмите «Искать». Двойной щелчок открывает файл.");
+        selectedFilePathLabel.setText("Файл не выбран");
+        statusLabel.setText("Укажите папку и текст, затем нажмите «Искать».");
     }
 
     /** Показывает содержимое выбранного слева файла в правой панели, подсвечивая найденный текст. */
     private void showFileContent(Path file) {
         if (file == null) {
+            selectedFilePathLabel.setText("Файл не выбран");
             contentView.clear();
             resultNavigator.clear();
             updateFileMatchesLabel();
             updateHitButtons();
             return;
         }
+        selectedFilePathLabel.setText(file.toAbsolutePath().normalize().toString());
         try {
             resultNavigator.setHits(contentView.showFile(file, searchPattern));
             updateFileMatchesLabel();
