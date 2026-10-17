@@ -4,9 +4,12 @@ import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.Dialog;
+import javafx.scene.control.Label;
+import javafx.scene.control.TextField;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.input.MouseButton;
+import javafx.scene.layout.VBox;
 import javafx.stage.Window;
 
 import java.io.IOException;
@@ -28,7 +31,9 @@ final class ApplicationChooser {
         }
 
         TableView<InstalledApplication.Entry> table = new TableView<>();
-        table.setItems(javafx.collections.FXCollections.observableArrayList(applications));
+        javafx.collections.ObservableList<InstalledApplication.Entry> filtered =
+                javafx.collections.FXCollections.observableArrayList(applications);
+        table.setItems(filtered);
         table.setPrefSize(720, 420);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
 
@@ -42,13 +47,26 @@ final class ApplicationChooser {
         table.getColumns().addAll(nameColumn, pathColumn);
         table.getSelectionModel().selectFirst();
 
+        TextField searchField = new TextField();
+        searchField.setPromptText("Поиск приложения или пути");
+        searchField.textProperty().addListener((observable, oldValue, newValue) -> {
+            filtered.setAll(applications.stream()
+                    .filter(application -> InstalledApplication.matches(application, newValue))
+                    .toList());
+            table.getSelectionModel().selectFirst();
+        });
+
+        Label searchLabel = new Label("Поиск:");
+        VBox content = new VBox(8, searchLabel, searchField, table);
+        content.setPrefSize(720, 470);
+
         ButtonType openButton = new ButtonType("Открыть", ButtonBar.ButtonData.OK_DONE);
         Dialog<ButtonType> dialog = new Dialog<>();
         dialog.initOwner(owner);
         dialog.setTitle("Открыть с помощью");
         dialog.setHeaderText("Выберите приложение для открытия файла");
         dialog.setContentText(file.getFileName().toString());
-        dialog.getDialogPane().setContent(table);
+        dialog.getDialogPane().setContent(content);
         dialog.getDialogPane().getButtonTypes().addAll(openButton, ButtonType.CANCEL);
         dialog.getDialogPane().lookupButton(openButton).setDisable(false);
 

@@ -30,6 +30,35 @@ final class InstalledApplication {
                 .toList();
     }
 
+    static boolean matches(Entry application, String query) {
+        String normalized = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
+        if (normalized.isEmpty()) {
+            return true;
+        }
+        String name = application.name().toLowerCase(Locale.ROOT);
+        String path = application.path().toString().toLowerCase(Locale.ROOT);
+        return name.contains(normalized)
+                || path.contains(normalized)
+                || abbreviation(name).contains(normalized);
+    }
+
+    private static String abbreviation(String name) {
+        StringBuilder result = new StringBuilder();
+        boolean wordStart = true;
+        for (int i = 0; i < name.length(); i++) {
+            char character = name.charAt(i);
+            if (Character.isLetterOrDigit(character)) {
+                if (wordStart) {
+                    result.append(character);
+                }
+                wordStart = false;
+            } else {
+                wordStart = true;
+            }
+        }
+        return result.toString();
+    }
+
     static void launch(Entry application, Path file) throws IOException {
         String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
         if (os.contains("mac")) {
