@@ -114,6 +114,7 @@ public class MainController {
     private void initialize() {
         fileNameColumn.setCellValueFactory(cell -> new ReadOnlyStringWrapper(cell.getValue().getFileName().toString()));
         contentView = new FileContentView(textScrollPane, contentRow, lineNumberLabel, lineNumberHighlightLabel);
+        ApplicationChooser.preload();
 
         fileTable.setItems(files);
 

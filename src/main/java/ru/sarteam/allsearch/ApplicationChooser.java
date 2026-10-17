@@ -12,20 +12,54 @@ import javafx.scene.control.TableCell;
 import javafx.scene.input.MouseButton;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
+import javafx.application.Platform;
 
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
 /** Диалог выбора установленного приложения для открытия файла. */
 final class ApplicationChooser {
+    private static volatile CompletableFuture<List<InstalledApplication.Entry>> applicationsFuture;
+
     private ApplicationChooser() {
     }
 
+    /** Запускает поиск приложений в фоне и возвращает общий результат для диалогов. */
+    static CompletableFuture<List<InstalledApplication.Entry>> preload() {
+        CompletableFuture<List<InstalledApplication.Entry>> current = applicationsFuture;
+        if (current != null) {
+            return current;
+        }
+        synchronized (ApplicationChooser.class) {
+            if (applicationsFuture == null) {
+                applicationsFuture = CompletableFuture.supplyAsync(InstalledApplication::find,
+                        runnable -> {
+                            Thread thread = new Thread(runnable, "installed-applications-loader");
+                            thread.setDaemon(true);
+                            thread.start();
+                        });
+            }
+            return applicationsFuture;
+        }
+    }
+
     static void open(Path file, Window owner, Consumer<String> onError) {
-        List<InstalledApplication.Entry> applications = InstalledApplication.find();
+        preload().whenComplete((applications, error) -> Platform.runLater(() -> {
+            if (error != null) {
+                onError.accept("Не удалось загрузить список приложений: " + error.getMessage());
+                return;
+            }
+            showDialog(file, owner, applications, onError);
+        }));
+    }
+
+    private static void showDialog(Path file, Window owner,
+                                   List<InstalledApplication.Entry> applications,
+                                   Consumer<String> onError) {
         if (applications.isEmpty()) {
             onError.accept("Установленные приложения не найдены.");
             return;
