@@ -7,7 +7,9 @@ import javafx.fxml.FXML;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
+import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
+import javafx.scene.control.MenuItem;
 import javafx.scene.control.ProgressBar;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Spinner;
@@ -17,7 +19,6 @@ import javafx.scene.control.TableRow;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.scene.control.Tooltip;
-import javafx.scene.input.MouseButton;
 import javafx.scene.layout.HBox;
 import javafx.scene.text.Font;
 import javafx.stage.DirectoryChooser;
@@ -133,9 +134,11 @@ public class MainController {
                     Tooltip.install(row, tooltip);
                 }
             });
-            row.setOnMouseClicked(event -> {
-                if (event.getButton() == MouseButton.PRIMARY && event.getClickCount() == 2 && !row.isEmpty()) {
-                    openFile(row.getItem());
+            row.setOnContextMenuRequested(event -> {
+                if (!row.isEmpty()) {
+                    fileTable.getSelectionModel().select(row.getIndex());
+                    createFileContextMenu(row.getItem()).show(row, event.getScreenX(), event.getScreenY());
+                    event.consume();
                 }
             });
             return row;
@@ -455,7 +458,17 @@ public class MainController {
         updateHitButtons();
     }
 
-    private void openFile(Path file) {
+    private ContextMenu createFileContextMenu(Path file) {
+        MenuItem open = new MenuItem("Открыть");
+        open.setOnAction(event -> openWithDefaultApplication(file));
+
+        MenuItem openWith = new MenuItem("Открыть с помощью...");
+        openWith.setOnAction(event -> chooseApplicationAndOpen(file));
+
+        return new ContextMenu(open, openWith);
+    }
+
+    private void openWithDefaultApplication(Path file) {
         try {
             if (Desktop.isDesktopSupported()) {
                 Desktop.getDesktop().open(file.toFile());
@@ -465,5 +478,9 @@ public class MainController {
         } catch (IOException e) {
             statusLabel.setText("Не удалось открыть файл: " + e.getMessage());
         }
+    }
+
+    private void chooseApplicationAndOpen(Path file) {
+        ApplicationChooser.open(file, fileTable.getScene().getWindow(), statusLabel::setText);
     }
 }
