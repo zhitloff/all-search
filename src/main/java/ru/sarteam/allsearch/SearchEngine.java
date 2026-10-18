@@ -91,7 +91,7 @@ public final class SearchEngine {
 
     private void walk(Path dir, Options options, SearchPattern pattern, List<PathMatcher> matchers,
                       List<Result> results, Consumer<String> onFile, Consumer<Path> onMatchedFile) {
-        if (cancelled.get()) {
+        if (cancelled.get() || results.size() >= options.maxResults()) {
             return;
         }
         List<Path> files = new ArrayList<>();
@@ -115,12 +115,15 @@ public final class SearchEngine {
             return;
         }
         for (Path file : files) {
-            if (cancelled.get()) {
+            if (cancelled.get() || results.size() >= options.maxResults()) {
                 return;
             }
             searchFile(file, options, pattern, matchers, results, onFile, onMatchedFile);
         }
         for (Path sub : dirs) {
+            if (cancelled.get() || results.size() >= options.maxResults()) {
+                return;
+            }
             walk(sub, options, pattern, matchers, results, onFile, onMatchedFile);
         }
     }
