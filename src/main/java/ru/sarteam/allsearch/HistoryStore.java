@@ -107,10 +107,21 @@ final class HistoryStore {
             return -1;
         }
         int depth = 0;
+        boolean inString = false;
+        boolean escaped = false;
         for (int i = start; i < json.length(); i++) {
-            if (json.charAt(i) == '[') {
+            char ch = json.charAt(i);
+            if (inString) {
+                if (escaped) escaped = false;
+                else if (ch == '\\') escaped = true;
+                else if (ch == '"') inString = false;
+                continue;
+            }
+            if (ch == '"') {
+                inString = true;
+            } else if (ch == '[') {
                 depth++;
-            } else if (json.charAt(i) == ']' && --depth == 0) {
+            } else if (ch == ']' && --depth == 0) {
                 return i;
             }
         }
