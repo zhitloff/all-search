@@ -94,6 +94,13 @@ public class MainController {
             System.getProperty("user.home"), ".all-search", "mask-history.json");
     private final ObservableList<Path> files = FXCollections.observableArrayList();
     private SearchTask searchTask;
+    private javafx.concurrent.Task<FileContentView.Prepared> previewTask;
+    private static final java.util.concurrent.ExecutorService PREVIEW_EXECUTOR =
+            java.util.concurrent.Executors.newFixedThreadPool(2, runnable -> {
+                Thread thread = new Thread(runnable, "file-preview");
+                thread.setDaemon(true);
+                return thread;
+            });
     private SearchPattern searchPattern = new SearchPattern("", false, false);
     private List<String> allFontFamilies = List.of();
     private final SearchResultNavigator resultNavigator = new SearchResultNavigator();
@@ -157,6 +164,10 @@ public class MainController {
 
     /** Показывает содержимое выбранного слева файла в правой панели, подсвечивая найденный текст. */
     private void showFileContent(Path file) {
+        if (previewTask != null) {
+            previewTask.cancel();
+            previewTask = null;
+        }
         if (file == null) {
             selectedFilePathLabel.setText("Файл не выбран");
             contentView.clear();
@@ -166,19 +177,34 @@ public class MainController {
             return;
         }
         selectedFilePathLabel.setText(file.toAbsolutePath().normalize().toString());
-        try {
-            resultNavigator.setHits(contentView.showFile(file, searchPattern));
+        contentView.clear();
+        resultNavigator.setHits(List.of());
+        updateFileMatchesLabel();
+        updateHitButtons();
+        SearchPattern pattern = searchPattern;
+        var task = new javafx.concurrent.Task<FileContentView.Prepared>() {
+            @Override protected FileContentView.Prepared call() throws IOException {
+                return FileContentView.prepare(file, pattern);
+            }
+        };
+        previewTask = task;
+        task.setOnSucceeded(event -> {
+            if (previewTask != task) return;
+            resultNavigator.setHits(contentView.show(task.getValue()));
             updateFileMatchesLabel();
             int initialHit = resultNavigator.initialHitIndex();
             resultNavigator.clearPendingHit();
             focusHit(initialHit);
-        } catch (IOException e) {
+        });
+        task.setOnFailed(event -> {
+            if (previewTask != task) return;
             contentView.clear();
             resultNavigator.clear();
             updateFileMatchesLabel();
             updateHitButtons();
-            statusLabel.setText("Не удалось прочитать файл: " + e.getMessage());
-        }
+            statusLabel.setText("Не удалось прочитать файл: " + task.getException().getMessage());
+        });
+        PREVIEW_EXECUTOR.execute(task);
     }
 
     private void focusHit(int index) {

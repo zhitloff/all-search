@@ -27,6 +27,27 @@ final class TextFileReader {
         return Files.readAllBytes(file);
     }
 
+    /** Ограниченное чтение для предпросмотра, независимо от размера файла. */
+    static String readPreview(Path file, int maxBytes) throws IOException {
+        try (var input = Files.newInputStream(file)) {
+            byte[] bytes = input.readNBytes(maxBytes);
+            boolean truncated = input.read() != -1;
+            if (truncated && hasUtf16Bom(bytes) && bytes.length % 2 != 0) {
+                bytes = java.util.Arrays.copyOf(bytes, bytes.length - 1);
+            } else if (truncated && !hasUtf16Bom(bytes) && !isValidUtf8(bytes)) {
+                // Граница предпросмотра может разрезать многобайтовый символ UTF-8.
+                for (int trim = 1; trim <= 3 && trim < bytes.length; trim++) {
+                    byte[] prefix = java.util.Arrays.copyOf(bytes, bytes.length - trim);
+                    if (isValidUtf8(prefix)) {
+                        bytes = prefix;
+                        break;
+                    }
+                }
+            }
+            return decodeBytes(bytes) + (truncated ? "\n\n… (предпросмотр обрезан)" : "");
+        }
+    }
+
     static boolean isBinary(byte[] bytes) {
         int n = Math.min(bytes.length, BINARY_PROBE);
         for (int i = 0; i < n; i++) {

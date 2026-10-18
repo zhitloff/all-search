@@ -42,6 +42,8 @@ class FileContentViewTest {
     void preservesNumbersWithoutHitsAndSelectionWhenChangingFont() throws Exception {
         Path file = directory.resolve("sample.txt");
         Files.writeString(file, "first\r\nsecond\rthird");
+        var missing = FileContentView.prepare(file, new SearchPattern("missing", false, true));
+        var matched = FileContentView.prepare(file, new SearchPattern("second", false, true));
         onFx(() -> {
             Label numbers = new Label();
             Label highlight = new Label();
@@ -49,20 +51,18 @@ class FileContentViewTest {
             ScrollPane scroll = new ScrollPane(row);
             row.getChildren().addAll(numbers, highlight);
             FileContentView view = new FileContentView(scroll, row, numbers, highlight);
-            assertTrue(view.showFile(file, new SearchPattern("missing", false, true)).isEmpty());
+            assertTrue(view.show(missing).isEmpty());
             view.clearHighlight();
-            assertEquals("1\n2\n3", numbers.getText());
-            assertEquals("", highlight.getText());
-            var hits = view.showFile(file, new SearchPattern("second", false, true));
+            var hits = view.show(matched);
             view.focusHit(hits.getFirst());
-            CodeArea content = (CodeArea) row.getChildren().getLast();
+            CodeArea content = (CodeArea) ((org.fxmisc.flowless.VirtualizedScrollPane<?>) scroll.getContent()).getContent();
+            assertEquals(3, content.getParagraphs().size());
+            assertNotNull(content.getParagraphGraphicFactory().apply(1));
             assertEquals("second", content.getSelectedText());
             Files.delete(file);
             view.setFont(FontConstants.DEFAULT_FONT_FAMILY, 20);
             assertEquals("second", content.getSelectedText());
-            assertEquals("1\n2\n3", numbers.getText());
-            assertEquals(" \n2\n ", highlight.getText());
-            assertTrue(numbers.getStyle().contains("20px"));
+            assertTrue(content.getStyle().contains("20px"));
             view.clear();
             assertEquals("", numbers.getText());
             assertEquals("", content.getText());
@@ -125,6 +125,29 @@ class FileContentViewTest {
             Label status = (Label) loader.getNamespace().get("statusLabel");
             assertFalse(status.textProperty().isBound());
             assertDoesNotThrow(() -> status.setText("Ошибка чтения"));
+            return null;
+        });
+    }
+
+    @Test
+    void discardsPreviewWhenSelectionIsCleared() throws Exception {
+        Path file = directory.resolve("preview.txt");
+        Files.writeString(file, "needle\n".repeat(10_000));
+        onFx(() -> {
+            FXMLLoader loader = fontLoader(directory.resolve("font.json"));
+            loader.load();
+            MainController controller = loader.getController();
+            var show = MainController.class.getDeclaredMethod("showFileContent", Path.class);
+            show.setAccessible(true);
+            show.invoke(controller, file);
+            var field = MainController.class.getDeclaredField("previewTask");
+            field.setAccessible(true);
+            var pending = (javafx.concurrent.Task<?>) field.get(controller);
+            assertNotNull(pending);
+            show.invoke(controller, (Object) null);
+            assertTrue(pending.isCancelled());
+            assertNull(field.get(controller));
+            assertEquals("Файл не выбран", ((Label) loader.getNamespace().get("selectedFilePathLabel")).getText());
             return null;
         });
     }
