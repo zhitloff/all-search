@@ -310,6 +310,16 @@ public class MainController {
     }
 
     @FXML
+    private void onPasteQuery() {
+        javafx.scene.input.Clipboard clipboard = javafx.scene.input.Clipboard.getSystemClipboard();
+        if (clipboard.hasString()) {
+            queryField.setText(clipboard.getString());
+            queryField.positionCaret(queryField.getLength());
+            queryField.requestFocus();
+        }
+    }
+
+    @FXML
     private void onSearch() {
         Path root;
         String rootText = currentDirectoryText();
