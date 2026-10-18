@@ -43,6 +43,16 @@ final class ApplicationChooser {
                             thread.setDaemon(true);
                             thread.start();
                         });
+                applicationsFuture.thenAccept(applications -> {
+                    Thread icons = new Thread(() -> {
+                        for (var entry : applications) {
+                            var image = ApplicationIcon.create(entry.path());
+                            Platform.runLater(() -> entry.setIcon(image));
+                        }
+                    }, "application-icons-loader");
+                    icons.setDaemon(true);
+                    icons.start();
+                });
             }
             return applicationsFuture;
         }
@@ -79,7 +89,15 @@ final class ApplicationChooser {
         iconColumn.setCellFactory(column -> new TableCell<>() {
             @Override
             protected void updateItem(InstalledApplication.Entry application, boolean empty) {
+                if (getItem() != null) getItem().iconProperty().removeListener(iconListener);
                 super.updateItem(application, empty);
+                if (!empty && application != null) application.iconProperty().addListener(iconListener);
+                render(application, empty);
+            }
+
+            private final javafx.beans.InvalidationListener iconListener = observable -> render(getItem(), isEmpty());
+
+            private void render(InstalledApplication.Entry application, boolean empty) {
                 if (empty || application == null || application.icon() == null) {
                     setGraphic(null);
                 } else {

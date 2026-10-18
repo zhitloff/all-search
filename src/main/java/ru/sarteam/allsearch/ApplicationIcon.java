@@ -1,6 +1,5 @@
 package ru.sarteam.allsearch;
 
-import javafx.scene.image.ImageView;
 import javafx.scene.image.Image;
 
 import java.awt.Graphics2D;
@@ -27,6 +26,7 @@ final class ApplicationIcon {
                 }
             }
             Icon source = FileSystemView.getFileSystemView().getSystemIcon(path.toFile());
+            if (source == null) return null;
             int size = 24;
             BufferedImage rendered = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
             Graphics2D graphics = rendered.createGraphics();
@@ -61,9 +61,10 @@ final class ApplicationIcon {
             png = Files.createTempFile("all-search-icon-", ".png");
             Process process = new ProcessBuilder("sips", "-s", "format", "png",
                     icon.toString(), "--out", png.toString())
-                    .redirectErrorStream(true)
+                    .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                    .redirectError(ProcessBuilder.Redirect.DISCARD)
                     .start();
-            if (process.waitFor() != 0 || !Files.isRegularFile(png)) {
+            if (!waitFor(process, 5, java.util.concurrent.TimeUnit.SECONDS) || !Files.isRegularFile(png)) {
                 return null;
             }
             Image image = new Image(png.toUri().toString(), 24, 24, true, true, false);
@@ -84,6 +85,15 @@ final class ApplicationIcon {
                     // Временный файл будет удалён системой позже.
                 }
             }
+        }
+    }
+
+    static boolean waitFor(Process process, long timeout, java.util.concurrent.TimeUnit unit)
+            throws InterruptedException {
+        try {
+            return process.waitFor(timeout, unit) && process.exitValue() == 0;
+        } finally {
+            if (process.isAlive()) process.destroyForcibly();
         }
     }
 }

@@ -29,7 +29,6 @@ final class InstalledApplication {
         List<Entry> result = applications.values().stream()
                 .sorted(Comparator.comparing(Entry::name, String.CASE_INSENSITIVE_ORDER))
                 .toList();
-        result.forEach(entry -> entry.setIcon(ApplicationIcon.create(entry.path())));
         return result;
     }
 
@@ -111,7 +110,7 @@ final class InstalledApplication {
                     .filter(path -> path.toString().toLowerCase(Locale.ROOT).endsWith(suffix))
                     .forEach(path -> result.putIfAbsent(path.toAbsolutePath().normalize().toString(),
                             new Entry(displayName(path), path)));
-        } catch (IOException | SecurityException ignored) {
+        } catch (IOException | java.io.UncheckedIOException | SecurityException ignored) {
             // Недоступный каталог не должен мешать открытию файла.
         }
     }
@@ -132,7 +131,7 @@ final class InstalledApplication {
     static final class Entry {
         private final String name;
         private final Path path;
-        private Image icon;
+        private final javafx.beans.property.ObjectProperty<Image> icon = new javafx.beans.property.SimpleObjectProperty<>();
 
         Entry(String name, Path path) {
             this.name = name;
@@ -148,11 +147,15 @@ final class InstalledApplication {
         }
 
         Image icon() {
-            return icon;
+            return icon.get();
         }
 
         void setIcon(Image icon) {
-            this.icon = icon;
+            this.icon.set(icon);
+        }
+
+        javafx.beans.property.ReadOnlyObjectProperty<Image> iconProperty() {
+            return icon;
         }
 
         @Override
