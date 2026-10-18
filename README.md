@@ -81,6 +81,9 @@ mvnw.cmd clean package -Pwindows-portable
 
 ### Linux (DEB)
 
+Для команды «Открыть с помощью…» нужен `gio` (в Debian/Ubuntu пакет
+`libglib2.0-bin`). Он запускает приложения по их `.desktop`-описаниям.
+
 Профиль `linux` включён автоматически на Linux:
 
 ```bash

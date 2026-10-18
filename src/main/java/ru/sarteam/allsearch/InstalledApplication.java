@@ -66,11 +66,21 @@ final class InstalledApplication {
         String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
         if (os.contains("mac")) {
             new ProcessBuilder("open", "-a", application.path().toString(), file.toString()).start();
+        } else if (!os.contains("win")) {
+            new ProcessBuilder(linuxLaunchCommand(application, file))
+                    .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                    .redirectError(ProcessBuilder.Redirect.DISCARD).start();
         } else if (application.path().toString().toLowerCase(Locale.ROOT).endsWith(".lnk")) {
             new ProcessBuilder("cmd", "/c", "start", "", application.path().toString(), file.toString()).start();
         } else {
             new ProcessBuilder(application.path().toString(), file.toString()).start();
         }
+    }
+
+    /** GIO интерпретирует Exec и подстановки %f/%F/%u/%U desktop entry. */
+    static List<String> linuxLaunchCommand(Entry application, Path file) {
+        return List.of("gio", "launch", application.path().toAbsolutePath().toString(),
+                file.toAbsolutePath().toString());
     }
 
     private static void addMacApplications(Map<String, Entry> result) {
