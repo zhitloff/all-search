@@ -21,17 +21,17 @@ final class SyntaxHighlighter {
     private static final byte MD_HEADING = 10, MD_CODE = 11, MD_LINK = 12, MD_QUOTE = 13, MD_LIST = 14;
 
     private static final Pattern CODE = Pattern.compile(
-            "(?<COMMENT>//[^\\n]*|/\\*(?:.|\\R)*?\\*/)|"
-                    + "(?<STRING>\"(?:\\\\.|[^\"\\\\])*\"|'(?:\\\\.|[^'\\\\])*')|"
+            "(?<COMMENT>//[^\\n]*|/\\*[\\s\\S]*?\\*/)|"
+                    + "(?<STRING>\"(?:\\\\.|[^\"\\\\])*+\"|'(?:\\\\.|[^'\\\\])*+')|"
                     + "(?<ANNOT>@[A-Za-z_][A-Za-z0-9_]*)|"
                     + "(?<NUMBER>\\b\\d+(?:\\.\\d+)?\\b)|"
                     + "(?<KEYWORD>\\b(?:abstract|assert|boolean|break|byte|case|catch|char|class|const|continue|default|do|double|else|"
                     + "enum|extends|final|finally|float|for|goto|if|implements|import|instanceof|int|interface|long|native|new|package|"
                     + "private|protected|public|return|short|static|strictfp|super|switch|synchronized|this|throw|throws|transient|try|"
                     + "void|volatile|while|var|record|sealed|permits|yield|non-sealed|fun|val|let|fn|struct|impl|trait|use|namespace)\\b)", Pattern.MULTILINE);
-    private static final Pattern JSON = Pattern.compile("(?<STRING>\"(?:\\\\.|[^\"\\\\])*\")|(?<NUMBER>-?\\b\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?\\b)|(?<KEYWORD>\\b(?:true|false|null)\\b)|(?<PUNCT>[{}\\[\\]:,])");
-    private static final Pattern XML = Pattern.compile("(?<COMMENT><!--(?:.|\\R)*?-->)|(?<TAG></?[A-Za-z_:][A-Za-z0-9:._-]*)|(?<ATTR>[A-Za-z_:][A-Za-z0-9:._-]*(?=\\s*=))|(?<STRING>\"[^\"]*\"|'[^']*')", Pattern.MULTILINE);
-    private static final Pattern CSS = Pattern.compile("(?<COMMENT>/\\*(?:.|\\R)*?\\*/)|(?<PROPERTY>\\b[a-zA-Z-]+(?=\\s*:))|(?<NUMBER>\\b\\d+(?:\\.\\d+)?(?:px|em|rem|%|vh|vw|s|ms)?\\b)|(?<PUNCT>[{}:;(),.])|(?<STRING>\"(?:\\\\.|[^\"\\\\])*\"|'(?:\\\\.|[^'\\\\])*')", Pattern.MULTILINE);
+    private static final Pattern JSON = Pattern.compile("(?<STRING>\"(?:\\\\.|[^\"\\\\])*+\")|(?<NUMBER>-?\\b\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?\\b)|(?<KEYWORD>\\b(?:true|false|null)\\b)|(?<PUNCT>[{}\\[\\]:,])");
+    private static final Pattern XML = Pattern.compile("(?<COMMENT><!--[\\s\\S]*?-->)|(?<TAG></?[A-Za-z_:][A-Za-z0-9:._-]*)|(?<ATTR>[A-Za-z_:][A-Za-z0-9:._-]*(?=\\s*=))|(?<STRING>\"[^\"]*\"|'[^']*')", Pattern.MULTILINE);
+    private static final Pattern CSS = Pattern.compile("(?<COMMENT>/\\*[\\s\\S]*?\\*/)|(?<PROPERTY>\\b[a-zA-Z-]+(?=\\s*:))|(?<NUMBER>\\b\\d+(?:\\.\\d+)?(?:px|em|rem|%|vh|vw|s|ms)?\\b)|(?<PUNCT>[{}:;(),.])|(?<STRING>\"(?:\\\\.|[^\"\\\\])*+\"|'(?:\\\\.|[^'\\\\])*+')", Pattern.MULTILINE);
     private static final Pattern MD_FENCE_PATTERN = Pattern.compile("(?ms)^```.*?$.*?^```\\s*$");
     private static final Pattern MD_HEADING_PATTERN = Pattern.compile("(?m)^#{1,6}\\s.*$");
     private static final Pattern MD_QUOTE_PATTERN = Pattern.compile("(?m)^>.*$");
