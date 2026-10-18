@@ -7,43 +7,72 @@
     <groupId>ru.sarteam</groupId>
     <artifactId>all-search</artifactId>
     <version>1.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
     <name>all-search</name>
+    <description>Десктоп-приложение на JavaFX для полнотекстового поиска по файлам.</description>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+        <java.version>25</java.version>
+        <app.name>all-search</app.name>
+        <app.vendor>sarteam</app.vendor>
+        <app.version>1.0.0</app.version>
+        <main.class>ru.sarteam.allsearch.Launcher</main.class>
+
+        <!-- Версии зависимостей -->
+        <javafx.version>21.0.6</javafx.version>
+        <controlsfx.version>11.2.1</controlsfx.version>
+        <ikonli.version>12.3.1</ikonli.version>
+        <richtextfx.version>0.11.2</richtextfx.version>
         <junit.version>5.12.1</junit.version>
+
+        <!-- Версии плагинов -->
+        <maven-compiler-plugin.version>3.16.0</maven-compiler-plugin.version>
+        <maven-shade-plugin.version>3.6.2</maven-shade-plugin.version>
+        <maven-dependency-plugin.version>3.8.1</maven-dependency-plugin.version>
+        <jpackage-maven-plugin.version>0.1.1</jpackage-maven-plugin.version>
+
+        <!-- Каталог с иконками приложения -->
+        <icons.dir>${project.basedir}/src/main/resources/ru/sarteam/allsearch/icons</icons.dir>
+
+        <!-- Параметры дистрибутивов, переопределяются профилями -->
+        <distributions.dir>${project.build.directory}/distributions</distributions.dir>
+
+        <!-- JVM-опции, общие для запуска и упаковки -->
+        <java.options>--enable-native-access=javafx.graphics</java.options>
     </properties>
 
     <dependencies>
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-controls</artifactId>
-            <version>21.0.6</version>
+            <version>${javafx.version}</version>
         </dependency>
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-fxml</artifactId>
-            <version>21.0.6</version>
+            <version>${javafx.version}</version>
         </dependency>
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-swing</artifactId>
-            <version>21.0.6</version>
+            <version>${javafx.version}</version>
         </dependency>
         <dependency>
             <groupId>org.controlsfx</groupId>
             <artifactId>controlsfx</artifactId>
-            <version>11.2.1</version>
+            <version>${controlsfx.version}</version>
         </dependency>
         <dependency>
             <groupId>org.kordamp.ikonli</groupId>
             <artifactId>ikonli-javafx</artifactId>
-            <version>12.3.1</version>
+            <version>${ikonli.version}</version>
         </dependency>
         <dependency>
             <groupId>org.fxmisc.richtext</groupId>
             <artifactId>richtextfx</artifactId>
-            <version>0.11.2</version>
+            <version>${richtextfx.version}</version>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
@@ -64,113 +93,154 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.13.0</version>
+                <version>${maven-compiler-plugin.version}</version>
                 <configuration>
-                    <source>25</source>
-                    <target>25</target>
+                    <release>${java.version}</release>
                 </configuration>
             </plugin>
+
+            <!-- Запуск приложения: mvn clean javafx:run -->
             <plugin>
                 <groupId>org.openjfx</groupId>
                 <artifactId>javafx-maven-plugin</artifactId>
                 <version>0.0.8</version>
-                <executions>
-                    <execution>
-                        <!-- Default configuration for running with: mvn clean javafx:run -->
-                        <id>default-cli</id>
-                        <configuration>
-                            <mainClass>ru.sarteam.allsearch/ru.sarteam.allsearch.MainApplication</mainClass>
-                            <jvmArgs>--enable-native-access=javafx.graphics</jvmArgs>
-                            <launcher>app</launcher>
-                            <jlinkZipName>app</jlinkZipName>
-                            <jlinkImageName>app</jlinkImageName>
-                            <noManPages>true</noManPages>
-                            <stripDebug>true</stripDebug>
-                            <noHeaderFiles>true</noHeaderFiles>
-                        </configuration>
-                    </execution>
-                </executions>
+                <configuration>
+                    <mainClass>ru.sarteam.allsearch/ru.sarteam.allsearch.MainApplication</mainClass>
+                    <options>
+                        <option>${java.options}</option>
+                    </options>
+                </configuration>
             </plugin>
+
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.5.2</version>
             </plugin>
+
+            <!-- Копирование модулей JavaFX для jlink внутри jpackage -->
             <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>exec-maven-plugin</artifactId>
-                <version>3.5.0</version>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>${maven-dependency-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>copy-javafx-modules</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>copy-dependencies</goal>
+                        </goals>
+                        <configuration>
+                            <includeGroupIds>org.openjfx</includeGroupIds>
+                            <includeScope>runtime</includeScope>
+                            <outputDirectory>${project.build.directory}/javafx-modules</outputDirectory>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- Fat JAR для jpackage: target/input/${project.build.finalName}.jar -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>${maven-shade-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <outputFile>${project.build.directory}/input/${project.build.finalName}.jar</outputFile>
+                            <!-- JavaFX поставляется отдельными модулями и подключается через modulePath -->
+                            <artifactSet>
+                                <excludes>
+                                    <exclude>org.openjfx:*</exclude>
+                                </excludes>
+                            </artifactSet>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>module-info.class</exclude>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                            <transformers>
+                                <!-- Объединяет META-INF/services (нужно для Ikonli и JavaFX) -->
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <mainClass>${main.class}</mainClass>
+                                    <manifestEntries>
+                                        <Implementation-Title>${project.name}</Implementation-Title>
+                                        <Implementation-Version>${project.version}</Implementation-Version>
+                                        <Implementation-Vendor>${app.vendor}</Implementation-Vendor>
+                                    </manifestEntries>
+                                </transformer>
+                            </transformers>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- Нативная упаковка: jlink-образ + jpackage -->
+            <plugin>
+                <groupId>io.github.huahill</groupId>
+                <artifactId>jpackage-maven-plugin</artifactId>
+                <version>${jpackage-maven-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>package-app</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>jpackage</goal>
+                        </goals>
+                        <configuration>
+                            <name>${app.name}</name>
+                            <packageVersion>${app.version}</packageVersion>
+                            <description>${project.description}</description>
+                            <vendor>${app.vendor}</vendor>
+                            <!-- packageType и icon задаются в профилях ОС -->
+                            <input>${project.build.directory}/input</input>
+                            <destination>${distributions.dir}</destination>
+                            <mainJar>${project.build.finalName}.jar</mainJar>
+                            <mainClass>${main.class}</mainClass>
+                            <modulePath>
+                                <path>${project.build.directory}/javafx-modules</path>
+                            </modulePath>
+                            <modules>
+                                <module>java.desktop</module>
+                                <module>java.logging</module>
+                                <module>jdk.unsupported</module>
+                                <module>javafx.controls</module>
+                                <module>javafx.fxml</module>
+                                <module>javafx.swing</module>
+                            </modules>
+                            <jlinkOptions>
+                                <option>--strip-debug</option>
+                                <option>--compress=zip-6</option>
+                                <option>--no-header-files</option>
+                                <option>--no-man-pages</option>
+                                <option>--strip-native-commands</option>
+                            </jlinkOptions>
+                            <javaOptions>
+                                <option>${java.options}</option>
+                            </javaOptions>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>
 
     <profiles>
+        <!-- macOS: DMG, активируется автоматически -->
         <profile>
-            <id>windows-portable</id>
-            <activation>
-                <os>
-                    <family>Windows</family>
-                </os>
-            </activation>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-dependency-plugin</artifactId>
-                        <version>3.8.1</version>
-                        <executions>
-                            <execution>
-                                <id>copy-runtime-dependencies-windows</id>
-                                <phase>prepare-package</phase>
-                                <goals>
-                                    <goal>copy-dependencies</goal>
-                                </goals>
-                                <configuration>
-                                    <includeScope>runtime</includeScope>
-                                    <outputDirectory>${project.build.directory}</outputDirectory>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-
-                    <plugin>
-                        <groupId>org.codehaus.mojo</groupId>
-                        <artifactId>exec-maven-plugin</artifactId>
-                        <version>3.5.0</version>
-                        <executions>
-                            <execution>
-                                <id>package-windows-portable</id>
-                                <phase>package</phase>
-                                <goals>
-                                    <goal>exec</goal>
-                                </goals>
-                                <configuration>
-                                    <executable>jpackage</executable>
-                                    <arguments>
-                                        <argument>--type</argument>
-                                        <argument>app-image</argument>
-                                        <argument>--name</argument>
-                                        <argument>all-search</argument>
-                                        <argument>--dest</argument>
-                                        <argument>${project.build.directory}/installer</argument>
-                                        <argument>--input</argument>
-                                        <argument>${project.build.directory}</argument>
-                                        <argument>--main-jar</argument>
-                                        <argument>${project.build.finalName}.jar</argument>
-                                        <argument>--main-class</argument>
-                                        <argument>ru.sarteam.allsearch.Launcher</argument>
-                                        <argument>--java-options</argument>
-                                        <argument>--enable-native-access=javafx.graphics</argument>
-                                    </arguments>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-        <profile>
-            <id>mac-dmg</id>
+            <id>mac</id>
             <activation>
                 <os>
                     <family>mac</family>
@@ -179,58 +249,76 @@
             <build>
                 <plugins>
                     <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-dependency-plugin</artifactId>
-                        <version>3.8.1</version>
-                        <executions>
-                            <execution>
-                                <id>copy-runtime-dependencies</id>
-                                <phase>prepare-package</phase>
-                                <goals>
-                                    <goal>copy-dependencies</goal>
-                                </goals>
-                                <configuration>
-                                    <includeScope>runtime</includeScope>
-                                    <outputDirectory>${project.build.directory}</outputDirectory>
-                                </configuration>
-                            </execution>
-                        </executions>
+                        <groupId>io.github.huahill</groupId>
+                        <artifactId>jpackage-maven-plugin</artifactId>
+                        <configuration>
+                            <icon>${icons.dir}/all-search.icns</icon>
+                            <packageType>dmg</packageType>
+                            <macPackageName>${app.name}</macPackageName>
+                            <macAppCategory>public.app-category.productivity</macAppCategory>
+                        </configuration>
                     </plugin>
+                </plugins>
+            </build>
+        </profile>
 
+        <!-- Windows: установщик EXE (WiX). Запуск: mvnw.cmd package -Pwindows -->
+        <profile>
+            <id>windows</id>
+            <build>
+                <plugins>
                     <plugin>
-                        <groupId>org.codehaus.mojo</groupId>
-                        <artifactId>exec-maven-plugin</artifactId>
-                        <version>3.5.0</version>
-                        <executions>
-                            <execution>
-                                <id>package-dmg</id>
-                                <phase>package</phase>
-                                <goals>
-                                    <goal>exec</goal>
-                                </goals>
-                                <configuration>
-                                    <executable>jpackage</executable>
-                                    <arguments>
-                                        <argument>--type</argument>
-                                        <argument>dmg</argument>
-                                        <argument>--name</argument>
-                                        <argument>all-search</argument>
-                                        <argument>--icon</argument>
-                                        <argument>${project.basedir}/src/main/resources/ru/sarteam/allsearch/icons/all-search.icns</argument>
-                                        <argument>--dest</argument>
-                                        <argument>${project.build.directory}/installer</argument>
-                                        <argument>--input</argument>
-                                        <argument>${project.build.directory}</argument>
-                                        <argument>--main-jar</argument>
-                                        <argument>${project.build.finalName}.jar</argument>
-                                        <argument>--main-class</argument>
-                                        <argument>ru.sarteam.allsearch.Launcher</argument>
-                                        <argument>--java-options</argument>
-                                        <argument>--enable-native-access=javafx.graphics</argument>
-                                    </arguments>
-                                </configuration>
-                            </execution>
-                        </executions>
+                        <groupId>io.github.huahill</groupId>
+                        <artifactId>jpackage-maven-plugin</artifactId>
+                        <configuration>
+                            <icon>${icons.dir}/all-search.ico</icon>
+                            <packageType>exe</packageType>
+                            <winMenu>true</winMenu>
+                            <winMenuGroup>Development</winMenuGroup>
+                            <winShortcut>true</winShortcut>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <!-- Windows: portable app-image без установки. Запуск: mvnw.cmd package -Pwindows-portable -->
+        <profile>
+            <id>windows-portable</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>io.github.huahill</groupId>
+                        <artifactId>jpackage-maven-plugin</artifactId>
+                        <configuration>
+                            <icon>${icons.dir}/all-search.ico</icon>
+                            <packageType>app-image</packageType>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <!-- Linux: DEB, активируется автоматически -->
+        <profile>
+            <id>linux</id>
+            <activation>
+                <os>
+                    <family>linux</family>
+                </os>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>io.github.huahill</groupId>
+                        <artifactId>jpackage-maven-plugin</artifactId>
+                        <configuration>
+                            <icon>${icons.dir}/all-search.png</icon>
+                            <packageType>deb</packageType>
+                            <linuxPackageName>${app.name}</linuxPackageName>
+                            <linuxShortcut>true</linuxShortcut>
+                            <linuxMenuGroup>Development</linuxMenuGroup>
+                        </configuration>
                     </plugin>
                 </plugins>
             </build>
