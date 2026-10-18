@@ -420,7 +420,11 @@ public class MainController {
         });
         task.setOnCancelled(event -> finish("Поиск отменён."));
         progressBar.progressProperty().bind(task.progressProperty());
-        statusLabel.textProperty().bind(task.messageProperty());
+        task.messageProperty().addListener((observable, oldMessage, message) -> {
+            if (searchTask == task && task.isRunning()) {
+                statusLabel.setText(message);
+            }
+        });
         task.start();
     }
 

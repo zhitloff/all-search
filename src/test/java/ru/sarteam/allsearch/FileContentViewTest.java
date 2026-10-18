@@ -114,6 +114,22 @@ class FileContentViewTest {
     }
 
     @Test
+    void allowsErrorStatusWhileSearchIsRunning() throws Exception {
+        onFx(() -> {
+            FXMLLoader loader = fontLoader(directory.resolve("settings.json"));
+            loader.load();
+            MainController controller = loader.getController();
+            var start = MainController.class.getDeclaredMethod("startSearch", Path.class, SearchEngine.Options.class);
+            start.setAccessible(true);
+            start.invoke(controller, directory, new SearchEngine.Options("hit", false, true, List.of(), true, 1));
+            Label status = (Label) loader.getNamespace().get("statusLabel");
+            assertFalse(status.textProperty().isBound());
+            assertDoesNotThrow(() -> status.setText("Ошибка чтения"));
+            return null;
+        });
+    }
+
+    @Test
     void deliversMatchedFilesBeforeSearchCompletion() throws Exception {
         Path file = directory.resolve("sample.txt");
         Files.writeString(file, "needle\nneedle");
