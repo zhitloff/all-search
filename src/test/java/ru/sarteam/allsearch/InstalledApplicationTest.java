@@ -18,6 +18,11 @@ class InstalledApplicationTest {
     private static final InstalledApplication.Entry CODE =
             new InstalledApplication.Entry("Visual Studio Code", Path.of("/Applications/Visual Studio Code.app"));
 
+    // Путь в стиле Windows, чтобы проверить поиск по пути на обеих платформах.
+    private static final InstalledApplication.Entry WINDOWS =
+            new InstalledApplication.Entry("Visual Studio Code",
+                    Path.of("C:\\Program Files\\Visual Studio Code\\Code.exe"));
+
     @Test
     void findsApplicationByWordInitials() {
         assertTrue(InstalledApplication.matches(CODE, "VSC"));
@@ -29,5 +34,14 @@ class InstalledApplicationTest {
     void keepsPathSearchAndRejectsUnrelatedQuery() {
         assertTrue(InstalledApplication.matches(CODE, "Applications/Visual"));
         assertFalse(InstalledApplication.matches(CODE, "VST"));
+    }
+
+    @Test
+    void matchesPathRegardlessOfSeparatorStyle() {
+        // Запрос с любым разделителем совпадает и с Unix-, и с Windows-путём.
+        assertTrue(InstalledApplication.matches(CODE, "Applications/Visual"));
+        assertTrue(InstalledApplication.matches(CODE, "Applications\\Visual"));
+        assertTrue(InstalledApplication.matches(WINDOWS, "Program Files/Visual"));
+        assertTrue(InstalledApplication.matches(WINDOWS, "Program Files\\Visual"));
     }
 }
