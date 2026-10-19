@@ -78,7 +78,9 @@
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-api</artifactId>
             <version>${junit.version}</version>
-            <scope>test</scope>
+            <!-- provided, чтобы JUnit был виден при компиляции module-info и запуске
+                 тестов по module path; в дистрибутив зависимость не попадает -->
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>

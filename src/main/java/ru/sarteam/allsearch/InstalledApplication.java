@@ -38,9 +38,10 @@ final class InstalledApplication {
             return true;
         }
         String name = application.name().toLowerCase(Locale.ROOT);
-        String path = application.path().toString().toLowerCase(Locale.ROOT);
+        String path = application.path().toString().toLowerCase(Locale.ROOT).replace('\\', '/');
+        String pathQuery = normalized.replace('\\', '/');
         return name.contains(normalized)
-                || path.contains(normalized)
+                || path.contains(pathQuery)
                 || abbreviation(name).contains(normalized);
     }
 
