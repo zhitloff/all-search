@@ -18,6 +18,7 @@
     -line-number-active-text: #c00000;
     -search-hit-text: #d33a2c;
     -search-hit-background: transparent;
+    -theme-icon-color: #1f2430;
 
     -syntax-keyword: #0000cc;
     -syntax-string: #b03060;
@@ -61,12 +62,18 @@
     -fx-text-fill: #1f2430;
 }
 
-.button {
+.button,
+.toggle-button,
+.toggle-button:selected {
     -fx-background-color: linear-gradient(to bottom, #ffffff, #edf2fb);
     -fx-border-color: #d6deea;
     -fx-text-fill: #1f2430;
     -fx-background-radius: 8;
     -fx-border-radius: 8;
+}
+
+.toggle-button .ikonli-font-icon {
+    -fx-icon-color: -theme-icon-color;
 }
 
 .button:default {

@@ -15,8 +15,10 @@
 <?import javafx.scene.control.ToggleButton?>
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
 
 <BorderPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="ru.sarteam.allsearch.MainController">
@@ -48,7 +50,13 @@
                 <Label text="Шрифт:"/>
                 <ComboBox fx:id="fontFamilyCombo" prefWidth="180.0"/>
                 <Spinner fx:id="fontSizeSpinner" prefWidth="90.0" editable="true"/>
-                <ToggleButton fx:id="themeToggle" text="Тёмная тема" onAction="#onToggleTheme"/>
+                <Region HBox.hgrow="ALWAYS"/>
+                <ToggleButton fx:id="themeToggle" onAction="#onToggleTheme"
+                              minWidth="34.0" minHeight="30.0">
+                    <graphic>
+                        <FontIcon fx:id="themeIcon" iconLiteral="fas-moon" iconSize="15"/>
+                    </graphic>
+                </ToggleButton>
             </HBox>
         </VBox>
     </top>

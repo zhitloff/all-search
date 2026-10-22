@@ -18,6 +18,7 @@
     -line-number-active-text: #ffcc66;
     -search-hit-text: #ffb3a7;
     -search-hit-background: rgba(255, 122, 100, 0.18);
+    -theme-icon-color: #e6e8ec;
 
     -syntax-keyword: #7aa8ff;
     -syntax-string: #ce9178;
@@ -61,6 +62,11 @@
     -fx-text-fill: #e6e8ec;
 }
 
+/* Подсказки в пустых полях (в т.ч. в редакторах ComboBox и Spinner). */
+.text-field {
+    -fx-prompt-text-fill: #9aa0ad;
+}
+
 .combo-box .list-cell {
     -fx-text-fill: #e6e8ec;
     -fx-background-color: #2b2f36;
@@ -83,12 +89,18 @@
     -fx-background-color: #3f7ff2;
 }
 
-.button {
+.button,
+.toggle-button,
+.toggle-button:selected {
     -fx-background-color: linear-gradient(to bottom, #343944, #2b2f36);
     -fx-border-color: #3a404b;
     -fx-text-fill: #e6e8ec;
     -fx-background-radius: 8;
     -fx-border-radius: 8;
+}
+
+.toggle-button .ikonli-font-icon {
+    -fx-icon-color: -theme-icon-color;
 }
 
 .button:default {

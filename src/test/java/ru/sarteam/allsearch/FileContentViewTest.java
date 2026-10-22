@@ -15,6 +15,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.paint.Color;
 import org.fxmisc.richtext.CodeArea;
 import org.fxmisc.richtext.TextExt;
+import org.kordamp.ikonli.javafx.FontIcon;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -200,7 +201,7 @@ class FileContentViewTest {
     }
 
     @Test
-    void appliesSavedThemeToSceneAndKeepsToggleLabelInSync() throws Exception {
+    void appliesSavedThemeToSceneAndKeepsToggleIconInSync() throws Exception {
         onFx(() -> {
             FXMLLoader loader = fontLoader(directory.resolve("theme-settings.json"));
             javafx.scene.Parent root = loader.load();
@@ -211,12 +212,17 @@ class FileContentViewTest {
             controller.applySavedTheme(scene);
 
             ToggleButton toggle = (ToggleButton) loader.getNamespace().get("themeToggle");
+            FontIcon icon = (FontIcon) loader.getNamespace().get("themeIcon");
             boolean darkApplied = scene.getStylesheets().stream().anyMatch(s -> s.contains("theme-dark.css"));
             boolean lightApplied = scene.getStylesheets().stream().anyMatch(s -> s.contains("theme-light.css"));
             assertTrue(darkApplied ^ lightApplied, "к сцене должна быть применена ровно одна тема");
-            assertEquals(darkApplied ? "Светлая тема" : "Тёмная тема", toggle.getText(),
-                    "надпись на кнопке должна соответствовать применённой теме");
+            assertTrue(toggle.getText() == null || toggle.getText().isEmpty(),
+                    "у кнопки темы не должно быть надписи");
+            assertEquals(darkApplied ? "fas-sun" : "fas-moon", icon.getIconLiteral(),
+                    "иконка должна показывать действие переключения");
             assertEquals(darkApplied, toggle.isSelected());
+            assertEquals(darkApplied ? "Переключить на светлую тему" : "Переключить на тёмную тему",
+                    toggle.getTooltip().getText());
             return null;
         });
     }

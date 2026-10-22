@@ -24,6 +24,7 @@ import javafx.scene.control.Tooltip;
 import javafx.scene.layout.HBox;
 import javafx.scene.text.Font;
 import javafx.stage.DirectoryChooser;
+import org.kordamp.ikonli.javafx.FontIcon;
 
 import java.awt.Desktop;
 import java.io.File;
@@ -63,6 +64,8 @@ public class MainController {
     private Spinner<Integer> fontSizeSpinner;
     @FXML
     private ToggleButton themeToggle;
+    @FXML
+    private FontIcon themeIcon;
     @FXML
     private Button searchButton;
     @FXML
@@ -113,6 +116,7 @@ public class MainController {
     private final HistoryStore historyStore = new HistoryStore(HISTORY_FILE);
     private final FontSettingsStore fontSettingsStore;
     private static final String THEME_PREF_FILE = ".all-search-theme.txt";
+    private final Tooltip themeTooltip = new Tooltip();
     private boolean darkTheme;
 
     public MainController() {
@@ -377,7 +381,14 @@ public class MainController {
             return;
         }
         themeToggle.setSelected(darkTheme);
-        themeToggle.setText(darkTheme ? "Светлая тема" : "Тёмная тема");
+        if (themeIcon != null) {
+            // Иконка показывает действие: луна — переключить на тёмную, солнце — на светлую.
+            themeIcon.setIconLiteral(darkTheme ? "fas-sun" : "fas-moon");
+        }
+        String action = darkTheme ? "Переключить на светлую тему" : "Переключить на тёмную тему";
+        themeTooltip.setText(action);
+        themeToggle.setTooltip(themeTooltip);
+        themeToggle.setAccessibleText(action);
     }
 
     private void setDarkTheme(boolean dark, boolean save) {
