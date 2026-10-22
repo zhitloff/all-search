@@ -184,7 +184,7 @@
                                     <mainClass>${main.class}</mainClass>
                                     <manifestEntries>
                                         <Implementation-Title>${project.name}</Implementation-Title>
-                                        <Implementation-Version>${project.version}</Implementation-Version>
+                                        <Implementation-Version>${app.version}</Implementation-Version>
                                         <Implementation-Vendor>${app.vendor}</Implementation-Vendor>
                                     </manifestEntries>
                                 </transformer>
