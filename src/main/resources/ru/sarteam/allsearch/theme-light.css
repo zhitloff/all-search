@@ -7,6 +7,32 @@
     -fx-focus-color: #6ca0ff;
     -fx-faint-focus-color: rgba(79, 140, 255, 0.15);
     -fx-text-background-color: #1f2430;
+
+    /* Палитра панели просмотра файла (см. search-highlight.css). */
+    -file-view-background: #ffffff;
+    -file-view-text: #1f2430;
+    -file-view-selection: #b3d7ff;
+    -line-number-background: #dddddd;
+    -line-number-text: #666666;
+    -line-number-border: #c8c8c8;
+    -line-number-active-text: #c00000;
+    -search-hit-text: #d33a2c;
+    -search-hit-background: transparent;
+
+    -syntax-keyword: #0000cc;
+    -syntax-string: #b03060;
+    -syntax-comment: #6a9955;
+    -syntax-number: #8a2be2;
+    -syntax-annotation: #aa5500;
+    -syntax-tag: #0033aa;
+    -syntax-attribute: #795e26;
+    -syntax-punctuation: #444444;
+    -syntax-property: #005a9c;
+    -syntax-md-heading: #1f4e79;
+    -syntax-md-code: #7a3e00;
+    -syntax-md-link: #0b61a4;
+    -syntax-md-quote: #5c7a5c;
+    -syntax-md-list: #444444;
 }
 
 #rootPane {
@@ -63,18 +89,19 @@
 }
 
 #textScrollPane {
-    -fx-background-color: #ffffff;
     -fx-border-color: #d6deea;
 }
 
 .code-area {
-    -fx-background-color: #ffffff;
-    -fx-fill: #1f2430;
+    -fx-padding: 4 6 4 6;
 }
 
-#lineNumberLabel {
-    -fx-text-fill: #7b8798;
-    -fx-border-color: transparent #d6deea transparent transparent;
+.code-area .paragraph-text {
+    -fx-line-spacing: 2px;
+}
+
+.content-area {
+    -fx-padding: 4 6 4 6;
 }
 
 .progress-bar > .track {

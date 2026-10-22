@@ -19,6 +19,9 @@ public class MainApplication extends Application {
         Scene scene = new Scene(fxmlLoader.load(), 960, 620);
         scene.getStylesheets().add(MainApplication.class.getResource("search-highlight.css").toExternalForm());
         scene.getStylesheets().add(MainApplication.class.getResource("theme-light.css").toExternalForm());
+        // Контроллер загружает сохранённую тему только когда Scene уже создана.
+        MainController controller = fxmlLoader.getController();
+        controller.applySavedTheme(scene);
         stage.setTitle("all-search — поиск по тексту в файлах");
         stage.getIcons().setAll(new Image(MainApplication.class.getResourceAsStream("icons/all-search.png")));
         stage.setMinWidth(640);

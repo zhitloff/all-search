@@ -1,24 +1,47 @@
-/* Подсветка найденного текста в CodeArea (правой панели). */
-.search-hit {
-    -fx-fill: #c00000;
-    -fx-font-weight: bold;
+/*
+ * Оформление панели просмотра файла (CodeArea): текст, синтаксис, нумерация
+ * строк, выделение и подсветка найденного. Цвета берутся из палитры, которую
+ * задают theme-light.css и theme-dark.css, поэтому при смене темы панель
+ * перекрашивается автоматически.
+ */
+
+/* Фон области с текстом: перекрывает белый фон, заданный RichTextFX в коде. */
+.code-area {
+    -fx-background-color: -file-view-background;
 }
 
-.syn-keyword { -fx-fill: #0000cc; -fx-font-weight: bold; }
-.syn-string { -fx-fill: #b03060; }
-.syn-comment { -fx-fill: #6a9955; -fx-font-style: italic; }
-.syn-number { -fx-fill: #8a2be2; }
-.syn-annotation { -fx-fill: #aa5500; }
-.syn-tag { -fx-fill: #0033aa; -fx-font-weight: bold; }
-.syn-attr { -fx-fill: #795e26; }
-.syn-punct { -fx-fill: #444444; }
-.syn-property { -fx-fill: #005a9c; }
+/* Базовый цвет текста; правила синтаксиса и подсветки ниже перекрывают его. */
+.paragraph-text .text {
+    -fx-fill: -file-view-text;
+}
 
-.syn-md-heading { -fx-fill: #1f4e79; -fx-font-weight: bold; }
-.syn-md-code { -fx-fill: #7a3e00; }
-.syn-md-link { -fx-fill: #0b61a4; -fx-underline: true; }
-.syn-md-quote { -fx-fill: #5c7a5c; }
-.syn-md-list { -fx-fill: #444444; }
+.paragraph-text .syn-keyword { -fx-fill: -syntax-keyword; -fx-font-weight: bold; }
+.paragraph-text .syn-string { -fx-fill: -syntax-string; }
+.paragraph-text .syn-comment { -fx-fill: -syntax-comment; -fx-font-style: italic; }
+.paragraph-text .syn-number { -fx-fill: -syntax-number; }
+.paragraph-text .syn-annotation { -fx-fill: -syntax-annotation; }
+.paragraph-text .syn-tag { -fx-fill: -syntax-tag; -fx-font-weight: bold; }
+.paragraph-text .syn-attr { -fx-fill: -syntax-attribute; }
+.paragraph-text .syn-punct { -fx-fill: -syntax-punctuation; }
+.paragraph-text .syn-property { -fx-fill: -syntax-property; }
+
+.paragraph-text .syn-md-heading { -fx-fill: -syntax-md-heading; -fx-font-weight: bold; }
+.paragraph-text .syn-md-code { -fx-fill: -syntax-md-code; }
+.paragraph-text .syn-md-link { -fx-fill: -syntax-md-link; -fx-underline: true; }
+.paragraph-text .syn-md-quote { -fx-fill: -syntax-md-quote; }
+.paragraph-text .syn-md-list { -fx-fill: -syntax-md-list; }
+
+/* Найденный текст: правило идёт после синтаксиса, чтобы перекрывать его цвета. */
+.paragraph-text .search-hit {
+    -fx-fill: -search-hit-text;
+    -fx-font-weight: bold;
+    -rtfx-background-color: -search-hit-background;
+}
+
+/* Курсор ввода: по умолчанию чёрный и теряется на тёмном фоне. */
+.code-area .caret {
+    -fx-fill: -file-view-text;
+}
 
 /* Область с текстом (CodeArea) и её текст должны иметь один шрифт. */
 .content-area {
@@ -30,24 +53,33 @@
     /* Не фиксируем шрифт здесь: размер/семейство задаются динамически из контроллера. */
 }
 
-/* Скроллпанель с текстом и номерами поверх белого фона панели. */
+/* Скроллпанель с текстом. */
 #textScrollPane {
-    -fx-background-color: white;
-    -fx-background: white;
+    -fx-background-color: -file-view-background;
+    -fx-background: -file-view-background;
     -fx-border-color: transparent;
 }
 
-/* Полоса с нумерацией строк (один Label на все строки файла). */
+/* Полоса с нумерацией строк (Label из RichTextFX LineNumberFactory, класс .lineno).
+ * CSS важнее фона #ddd и цвета #666, которые RichTextFX выставляет из кода. */
+.code-area .lineno {
+    -fx-background-color: -line-number-background;
+    -fx-text-fill: -line-number-text;
+    -fx-border-color: transparent -line-number-border transparent transparent;
+    -fx-border-width: 0 1 0 0;
+}
+
+/* Резервные Label-ы нумерации из main-view.fxml (сейчас не отображаются). */
 #lineNumberLabel {
-    -fx-text-fill: #888888;
+    -fx-text-fill: -line-number-text;
     -fx-padding: 0 8 0 8;
     -fx-translate-y: 0;
-    -fx-border-color: transparent #d0d0d0 transparent transparent;
+    -fx-border-color: transparent -line-number-border transparent transparent;
     -fx-border-width: 0 1 0 0;
 }
 
 #lineNumberHighlightLabel {
-    -fx-text-fill: #c00000;
+    -fx-text-fill: -line-number-active-text;
     -fx-font-weight: bold;
     -fx-padding: 0 8 0 8;
     -fx-translate-y: 0;
@@ -59,6 +91,6 @@
 
 /* Цвет выделения текста в CodeArea (мышь/клавиатура). */
 .content-area .selection {
-    -fx-fill: #b3d7ff;
-    -fx-stroke: #b3d7ff;
+    -fx-fill: -file-view-selection;
+    -fx-stroke: -file-view-selection;
 }

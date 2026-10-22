@@ -76,7 +76,11 @@ final class FileContentView {
         var factory = LineNumberFactory.get(content);
         content.setParagraphGraphicFactory(index -> {
             var node = factory.apply(index);
-            if (index == activeParagraph) node.setStyle("-fx-background-color: #ffe08a; -fx-text-fill: black;");
+            if (index == activeParagraph) {
+                node.setStyle("-fx-background-color: rgba(255, 193, 7, 0.25); -fx-padding: 0 10 0 10; -fx-font-weight: bold;");
+            } else {
+                node.setStyle("-fx-padding: 0 10 0 10;");
+            }
             return node;
         });
     }

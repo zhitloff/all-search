@@ -1,0 +1,158 @@
+/* Тёмная тема */
+.root {
+    -fx-base: #1f2228;
+    -fx-background: #1f2228;
+    -fx-control-inner-background: #2b2f36;
+    -fx-accent: #6ca0ff;
+    -fx-focus-color: #7aa8ff;
+    -fx-faint-focus-color: rgba(108, 160, 255, 0.18);
+    -fx-text-background-color: #e6e8ec;
+
+    /* Палитра панели просмотра файла (см. search-highlight.css). */
+    -file-view-background: #2b2f36;
+    -file-view-text: #e6e8ec;
+    -file-view-selection: #3a5b8a;
+    -line-number-background: #242830;
+    -line-number-text: #9aa0ad;
+    -line-number-border: #3a404b;
+    -line-number-active-text: #ffcc66;
+    -search-hit-text: #ffb3a7;
+    -search-hit-background: rgba(255, 122, 100, 0.18);
+
+    -syntax-keyword: #7aa8ff;
+    -syntax-string: #ce9178;
+    -syntax-comment: #7f9f6a;
+    -syntax-number: #b5cea8;
+    -syntax-annotation: #dcdcaa;
+    -syntax-tag: #4ec9b0;
+    -syntax-attribute: #9cdcfe;
+    -syntax-punctuation: #cfd3da;
+    -syntax-property: #9cdcfe;
+    -syntax-md-heading: #6cb6ff;
+    -syntax-md-code: #ce9178;
+    -syntax-md-link: #4daafc;
+    -syntax-md-quote: #9aa7b8;
+    -syntax-md-list: #cfd3da;
+}
+
+#rootPane {
+    -fx-background-color: linear-gradient(to bottom, #242830, #1b1d23);
+}
+
+.label {
+    -fx-text-fill: #e6e8ec;
+}
+
+.text-field,
+.combo-box,
+.spinner,
+.table-view,
+.scroll-pane,
+.code-area {
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+}
+
+.text-field,
+.combo-box,
+.spinner {
+    -fx-background-color: #2b2f36;
+    -fx-border-color: #3a404b;
+    -fx-text-fill: #e6e8ec;
+}
+
+.combo-box .list-cell {
+    -fx-text-fill: #e6e8ec;
+    -fx-background-color: #2b2f36;
+}
+
+.combo-box-popup .list-view {
+    -fx-background-color: #2b2f36;
+}
+
+.combo-box-popup .list-view .list-cell {
+    -fx-background-color: #2b2f36;
+    -fx-text-fill: #e6e8ec;
+}
+
+.combo-box-popup .list-view .list-cell:filled:hover {
+    -fx-background-color: #3a404b;
+}
+
+.combo-box-popup .list-view .list-cell:filled:selected {
+    -fx-background-color: #3f7ff2;
+}
+
+.button {
+    -fx-background-color: linear-gradient(to bottom, #343944, #2b2f36);
+    -fx-border-color: #3a404b;
+    -fx-text-fill: #e6e8ec;
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+}
+
+.button:default {
+    -fx-background-color: linear-gradient(to bottom, #6ca0ff, #3f7ff2);
+    -fx-border-color: #3a73db;
+    -fx-text-fill: white;
+}
+
+.table-view {
+    -fx-background-color: #2b2f36;
+    -fx-border-color: #3a404b;
+}
+
+.table-view .column-header-background {
+    -fx-background-color: #242830;
+}
+
+.table-view .column-header,
+.table-view .filler {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent #3a404b #3a404b transparent;
+}
+
+.table-view .column-header .label {
+    -fx-text-fill: #c9ccd3;
+}
+
+.table-row-cell {
+    -fx-background-color: #2b2f36;
+    -fx-text-fill: #e6e8ec;
+}
+
+.table-row-cell:filled {
+    -fx-background-color: #2b2f36;
+}
+
+.table-row-cell:filled:odd {
+    -fx-background-color: #292d34;
+}
+
+.table-row-cell:filled:selected {
+    -fx-background-color: #3a4d6b;
+}
+
+#textScrollPane {
+    -fx-border-color: #3a404b;
+}
+
+.code-area {
+    -fx-padding: 4 6 4 6;
+}
+
+.code-area .paragraph-text {
+    -fx-line-spacing: 2px;
+}
+
+.content-area {
+    -fx-padding: 4 6 4 6;
+}
+
+.progress-bar > .track {
+    -fx-background-color: #3a404b;
+}
+
+.progress-bar > .bar {
+    -fx-background-color: linear-gradient(to right, #6ca0ff, #3f7ff2);
+}

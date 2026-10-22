@@ -12,6 +12,7 @@
 <?import javafx.scene.control.TableColumn?>
 <?import javafx.scene.control.TableView?>
 <?import javafx.scene.control.TextField?>
+<?import javafx.scene.control.ToggleButton?>
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.StackPane?>
@@ -47,6 +48,7 @@
                 <Label text="Шрифт:"/>
                 <ComboBox fx:id="fontFamilyCombo" prefWidth="180.0"/>
                 <Spinner fx:id="fontSizeSpinner" prefWidth="90.0" editable="true"/>
+                <ToggleButton fx:id="themeToggle" text="Тёмная тема" onAction="#onToggleTheme"/>
             </HBox>
         </VBox>
     </top>

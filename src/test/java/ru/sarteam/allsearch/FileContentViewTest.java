@@ -9,8 +9,12 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Spinner;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.control.ToggleButton;
+import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.paint.Color;
 import org.fxmisc.richtext.CodeArea;
+import org.fxmisc.richtext.TextExt;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -183,6 +187,85 @@ class FileContentViewTest {
             return null;
         });
         assertTrue(finished.get(10, TimeUnit.SECONDS));
+    }
+
+    @Test
+    void rendersDarkThemeWithReadableTextAndLineNumbers() throws Exception {
+        assertContentPalette("theme-dark.css", true);
+    }
+
+    @Test
+    void keepsLightThemeReadable() throws Exception {
+        assertContentPalette("theme-light.css", false);
+    }
+
+    @Test
+    void appliesSavedThemeToSceneAndKeepsToggleLabelInSync() throws Exception {
+        onFx(() -> {
+            FXMLLoader loader = fontLoader(directory.resolve("theme-settings.json"));
+            javafx.scene.Parent root = loader.load();
+            Scene scene = new Scene(root, 1000, 700);
+            scene.getStylesheets().add(MainApplication.class.getResource("search-highlight.css").toExternalForm());
+            scene.getStylesheets().add(MainApplication.class.getResource("theme-light.css").toExternalForm());
+            MainController controller = loader.getController();
+            controller.applySavedTheme(scene);
+
+            ToggleButton toggle = (ToggleButton) loader.getNamespace().get("themeToggle");
+            boolean darkApplied = scene.getStylesheets().stream().anyMatch(s -> s.contains("theme-dark.css"));
+            boolean lightApplied = scene.getStylesheets().stream().anyMatch(s -> s.contains("theme-light.css"));
+            assertTrue(darkApplied ^ lightApplied, "к сцене должна быть применена ровно одна тема");
+            assertEquals(darkApplied ? "Светлая тема" : "Тёмная тема", toggle.getText(),
+                    "надпись на кнопке должна соответствовать применённой теме");
+            assertEquals(darkApplied, toggle.isSelected());
+            return null;
+        });
+    }
+
+    private void assertContentPalette(String themeFile, boolean dark) throws Exception {
+        Path file = directory.resolve("PaletteSample.java");
+        Files.writeString(file, """
+                public class Sample {
+                    int number = 42;
+                }
+                """);
+        onFx(() -> {
+            ScrollPane scroll = new ScrollPane();
+            FileContentView view = new FileContentView(scroll, new HBox(), new Label(), new Label());
+            view.show(FileContentView.prepare(file, new SearchPattern("Sample", false, true)));
+            BorderPane root = new BorderPane(scroll);
+            Scene scene = new Scene(root, 600, 240);
+            scene.getStylesheets().add(MainApplication.class.getResource("search-highlight.css").toExternalForm());
+            scene.getStylesheets().add(MainApplication.class.getResource(themeFile).toExternalForm());
+            root.applyCss();
+            root.layout();
+
+            CodeArea content = (CodeArea) ((org.fxmisc.flowless.VirtualizedScrollPane<?>) scroll.getContent()).getContent();
+            List<TextExt> segments = content.lookupAll(".text").stream()
+                    .filter(TextExt.class::isInstance).map(TextExt.class::cast).toList();
+            assertFalse(segments.isEmpty(), "панель должна отрисовать текст файла");
+            Color textFill = segments.stream()
+                    .filter(text -> " {".equals(text.getText()))
+                    .map(text -> (Color) text.getFill())
+                    .findFirst().orElseThrow();
+
+            Label number = (Label) content.lookupAll(".lineno").iterator().next();
+            Color gutterBackground = (Color) number.getBackground().getFills().getFirst().getFill();
+            Color gutterText = (Color) number.getTextFill();
+
+            if (dark) {
+                assertTrue(brightness(textFill) > 0.6, "текст в тёмной теме должен быть светлым: " + textFill);
+                assertTrue(brightness(gutterBackground) < 0.3, "фон нумерации должен быть тёмным: " + gutterBackground);
+                assertTrue(brightness(gutterText) > 0.4, "номера строк должны быть светлыми: " + gutterText);
+            } else {
+                assertTrue(brightness(textFill) < 0.3, "текст в светлой теме должен быть тёмным: " + textFill);
+                assertTrue(brightness(gutterBackground) > 0.6, "фон нумерации должен быть светлым: " + gutterBackground);
+            }
+            return null;
+        });
+    }
+
+    private static double brightness(Color color) {
+        return 0.2126 * color.getRed() + 0.7152 * color.getGreen() + 0.0722 * color.getBlue();
     }
 
     private static <T> T onFx(Callable<T> action) throws Exception {

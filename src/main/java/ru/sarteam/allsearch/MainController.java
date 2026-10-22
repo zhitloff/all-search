@@ -4,6 +4,7 @@ import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
+import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
@@ -18,6 +19,7 @@ import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableRow;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
+import javafx.scene.control.ToggleButton;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.HBox;
 import javafx.scene.text.Font;
@@ -59,6 +61,8 @@ public class MainController {
     private ComboBox<String> fontFamilyCombo;
     @FXML
     private Spinner<Integer> fontSizeSpinner;
+    @FXML
+    private ToggleButton themeToggle;
     @FXML
     private Button searchButton;
     @FXML
@@ -108,6 +112,8 @@ public class MainController {
     private FileContentView contentView;
     private final HistoryStore historyStore = new HistoryStore(HISTORY_FILE);
     private final FontSettingsStore fontSettingsStore;
+    private static final String THEME_PREF_FILE = ".all-search-theme.txt";
+    private boolean darkTheme;
 
     public MainController() {
         this(new FontSettingsStore(HISTORY_FILE));
@@ -132,6 +138,7 @@ public class MainController {
         maskField.getItems().setAll(history.masks());
         initFontControls();
         applyContentFont(currentFontFamily(), currentFontSize());
+        initTheme();
 
         fileTable.setRowFactory(tv -> {
             TableRow<Path> row = new TableRow<>();
@@ -333,6 +340,95 @@ public class MainController {
             directoryField.getEditor().setText(selected);
             rememberDirectory(selected);
         }
+    }
+
+    @FXML
+    private void onToggleTheme() {
+        setDarkTheme(!darkTheme, true);
+    }
+
+    private void initTheme() {
+        if (themeToggle == null) {
+            return;
+        }
+        darkTheme = loadThemePreference();
+        // При инициализации FXML сцены ещё нет, поэтому тема применится позже
+        // из MainApplication через applySavedTheme(Scene).
+        applyTheme();
+        updateThemeToggle();
+    }
+
+    /**
+     * Применяет сохранённую тему к уже созданной сцене. Вызывается из
+     * {@link MainApplication} после создания Scene: во время initialize()
+     * сцены ещё не существует, и без этого сохранённая тёмная тема терялась.
+     */
+    void applySavedTheme(Scene scene) {
+        if (themeToggle == null) {
+            return;
+        }
+        darkTheme = loadThemePreference();
+        applyTheme(scene);
+        updateThemeToggle();
+    }
+
+    private void updateThemeToggle() {
+        if (themeToggle == null) {
+            return;
+        }
+        themeToggle.setSelected(darkTheme);
+        themeToggle.setText(darkTheme ? "Светлая тема" : "Тёмная тема");
+    }
+
+    private void setDarkTheme(boolean dark, boolean save) {
+        darkTheme = dark;
+        updateThemeToggle();
+        applyTheme();
+        if (save) {
+            saveThemePreference(darkTheme);
+        }
+    }
+
+    private void applyTheme() {
+        applyTheme(directoryField == null ? null : directoryField.getScene());
+    }
+
+    private void applyTheme(Scene scene) {
+        if (scene == null) {
+            return;
+        }
+        ObservableList<String> stylesheets = scene.getStylesheets();
+        stylesheets.removeIf(s -> s != null && (s.contains("theme-light.css") || s.contains("theme-dark.css")));
+        String themeFile = darkTheme ? "theme-dark.css" : "theme-light.css";
+        java.net.URL url = MainApplication.class.getResource(themeFile);
+        if (url != null) {
+            stylesheets.add(url.toExternalForm());
+        }
+    }
+
+    private boolean loadThemePreference() {
+        try {
+            Path path = themePrefPath();
+            if (Files.exists(path)) {
+                String s = Files.readString(path).trim().toLowerCase();
+                return "dark".equals(s) || "true".equals(s) || "1".equals(s);
+            }
+        } catch (Exception ignored) {
+        }
+        return false;
+    }
+
+    private void saveThemePreference(boolean dark) {
+        try {
+            Path path = themePrefPath();
+            Files.createDirectories(path.getParent());
+            Files.writeString(path, dark ? "dark" : "light");
+        } catch (Exception ignored) {
+        }
+    }
+
+    private Path themePrefPath() {
+        return Path.of(System.getProperty("user.home"), ".all-search", THEME_PREF_FILE);
     }
 
     @FXML
