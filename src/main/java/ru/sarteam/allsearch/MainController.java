@@ -134,6 +134,9 @@ public class MainController {
         ApplicationChooser.preload();
 
         fileTable.setItems(files);
+        // Единственная колонка должна занимать всю ширину таблицы: иначе справа
+        // остаётся пустая область, которая выглядит как вторая колонка.
+        fileTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
 
         directoryField.setEditable(true);
         maskField.setEditable(true);
