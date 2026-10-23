@@ -5,7 +5,8 @@
 
 Навайбкодил за вечер тестируя разные LLM
 
-![alt-текст](./printsceen.png)
+![alt-текст](./all-search-1.0.0-lite.png)
+![alt-текст](./all-search-1.0.0-dark.png)
 
 ## Требования
 
